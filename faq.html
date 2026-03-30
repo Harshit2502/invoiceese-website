@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQ - InvoiceEase</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0F6E56;
+            --primary-light: #1D9E75;
+            --primary-dark: #085041;
+            --accent: #EF9F27;
+            --bg: #FAFAF8;
+            --surface: #FFFFFF;
+            --text: #1A1A1A;
+            --text-muted: #666666;
+            --border: #E5E5E0;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        
+        h1, h2, h3 {
+            font-family: 'Sora', sans-serif;
+            line-height: 1.2;
+        }
+        
+        /* Header */
+        header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 1.5rem 2rem;
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-family: 'Sora', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+        
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+        }
+        
+        /* Hero */
+        .faq-hero {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 60px 2rem 40px;
+            text-align: center;
+        }
+        
+        .faq-hero h1 {
+            font-size: 48px;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .faq-hero p {
+            font-size: 18px;
+            color: var(--text-muted);
+        }
+        
+        /* Search Box */
+        .search-box {
+            max-width: 600px;
+            margin: 32px auto 0;
+            position: relative;
+        }
+        
+        .search-box input {
+            width: 100%;
+            padding: 16px 24px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(15, 110, 86, 0.1);
+        }
+        
+        /* FAQ Container */
+        .faq-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px 2rem 80px;
+        }
+        
+        .faq-category {
+            margin-bottom: 60px;
+        }
+        
+        .category-title {
+            font-size: 24px;
+            margin-bottom: 24px;
+            color: var(--primary);
+        }
+        
+        .faq-item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+        
+        .faq-item:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        
+        .faq-question {
+            padding: 24px 28px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            font-size: 17px;
+            transition: background 0.3s;
+        }
+        
+        .faq-question:hover {
+            background: var(--bg);
+        }
+        
+        .faq-icon {
+            font-size: 24px;
+            color: var(--primary);
+            transition: transform 0.3s;
+            flex-shrink: 0;
+            margin-left: 16px;
+        }
+        
+        .faq-item.active .faq-icon {
+            transform: rotate(45deg);
+        }
+        
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        
+        .faq-item.active .faq-answer {
+            max-height: 500px;
+        }
+        
+        .faq-answer-content {
+            padding: 0 28px 28px;
+            color: var(--text-muted);
+            font-size: 15px;
+            line-height: 1.8;
+        }
+        
+        .faq-answer-content strong {
+            color: var(--text);
+        }
+        
+        /* Contact CTA */
+        .contact-cta {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            padding: 48px;
+            border-radius: 16px;
+            text-align: center;
+            color: white;
+            margin: 60px 0 40px;
+        }
+        
+        .contact-cta h3 {
+            font-size: 28px;
+            margin-bottom: 12px;
+        }
+        
+        .contact-cta p {
+            font-size: 16px;
+            margin-bottom: 24px;
+            opacity: 0.9;
+        }
+        
+        .contact-button {
+            background: var(--accent);
+            color: var(--text);
+            border: none;
+            padding: 14px 32px;
+            border-radius: 8px;
+            font-family: 'Sora', sans-serif;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .contact-button:hover {
+            background: #BA7517;
+            transform: translateY(-2px);
+        }
+        
+        /* Footer */
+        footer {
+            background: var(--text);
+            color: var(--bg);
+            padding: 40px 2rem;
+            text-align: center;
+        }
+        
+        footer p {
+            opacity: 0.7;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .faq-hero h1 {
+                font-size: 32px;
+            }
+            
+            .faq-question {
+                font-size: 16px;
+                padding: 20px;
+            }
+            
+            .faq-answer-content {
+                padding: 0 20px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="header-content">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">IE</div>
+                InvoiceEase
+            </a>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="faq-hero">
+        <h1>Frequently Asked Questions</h1>
+        <p>Everything you need to know about InvoiceEase</p>
+        
+        <div class="search-box">
+            <input type="text" placeholder="Search for answers..." id="searchInput" onkeyup="searchFAQs()">
+        </div>
+    </section>
+
+    <!-- FAQ Container -->
+    <section class="faq-container">
+        <!-- Getting Started -->
+        <div class="faq-category">
+            <h2 class="category-title">Getting Started</h2>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>How do I create my first invoice?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        After signing up, simply send a WhatsApp message to our number in this format: <strong>"Invoice for [Client Name], ₹[Amount], [Service Description]"</strong>. For example: "Invoice for Acme Corp, ₹50,000, Website Design". You'll receive a GST-compliant PDF within 30 seconds!
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>Do I need to download an app?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        No! That's the beauty of InvoiceEase. Everything works through WhatsApp, which you already have on your phone. Just save our WhatsApp number and start sending invoice requests.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>What information do I need to provide during signup?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        You'll need: <strong>Email, WhatsApp number, Business name, and optionally your GST number, PAN, address, and bank details</strong>. The more you provide upfront, the more automatic your invoices become. But you can always add this information later in your settings.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Using InvoiceEase -->
+        <div class="faq-category">
+            <h2 class="category-title">Using InvoiceEase</h2>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>Can I send invoice requests in Hindi?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        Yes! You can send invoice requests in <strong>Hindi, Marathi, or English</strong>. Our AI understands all three languages. You can even use voice notes! For example: "भैया, Sharma ji के लिए invoice बना दो, 50 हज़ार रुपये, website के लिए"
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>How do I add multiple items to one invoice?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        Simply list all items in your WhatsApp message. For example: <strong>"Invoice for ABC Ltd, Item 1: ₹20K website design, Item 2: ₹10K SEO services, Item 3: ₹5K content writing"</strong>. Our AI will parse each item and create a detailed invoice.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>Can I customize the invoice template?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        Pro and Business users get access to <strong>3 professional templates</strong> and can upload their logo. You can switch templates anytime from your dashboard. Free users get one basic template.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>Where can I see all my past invoices?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        Log in to your dashboard at invoiceease.in to see all your invoices. You can download any invoice as PDF, mark them as paid/unpaid, and see analytics about your billing.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>Can I edit an invoice after it's created?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        Currently, you cannot edit an invoice after creation (for accounting integrity). If you made a mistake, simply create a new invoice with the correct information. This also doesn't count against your monthly limit on paid plans.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- GST & Compliance -->
+        <div class="faq-category">
+            <h2 class="category-title">GST & Compliance</h2>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>Are the invoices GST compliant?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        Yes! All invoices are <strong>100% GST compliant</strong> as per Indian tax regulations. They include CGST/SGST breakdown, invoice numbering, GST numbers, and all required fields.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>What if I don't have a GST number?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        No problem! If you're not registered for GST (turnover under ₹40 lakh), you can still generate invoices. The GST field will simply be marked as N/A, and no GST will be calculated. Your invoices will still be professional and legally valid.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>How is GST calculated?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        For services, we apply <strong>18% GST (9% CGST + 9% SGST)</strong> for intra-state transactions and 18% IGST for inter-state. The invoice clearly shows the breakdown. You can customize GST rates in your settings if needed.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Billing & Payments -->
+        <div class="faq-category">
+            <h2 class="category-title">Billing & Payments</h2>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>How does the Free plan work?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        The Free plan gives you <strong>5 invoices per month, forever</strong>. No credit card required. Perfect for trying out InvoiceEase or if you invoice infrequently. When you hit the limit, you can upgrade to Pro for unlimited invoices.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>Can I cancel my subscription anytime?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        Yes! You can cancel anytime from your dashboard. Your account will remain active until the end of your current billing period. After cancellation, you'll automatically move to the Free plan.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>Do you offer refunds?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        Yes! We offer a <strong>30-day money-back guarantee</strong>. If you're not satisfied with InvoiceEase for any reason, email us within 30 days of your purchase and we'll refund you fully, no questions asked.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>What payment methods do you accept?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        We accept <strong>all major credit/debit cards, UPI, net banking, and digital wallets</strong> through Razorpay. All payments are secure and encrypted with industry-standard SSL.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Technical -->
+        <div class="faq-category">
+            <h2 class="category-title">Technical Questions</h2>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>Is my data secure?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        Yes! We use <strong>bank-level encryption</strong> (256-bit SSL) to protect your data. All invoices are stored securely in the cloud. We never share your data with third parties. Your WhatsApp messages are processed and immediately deleted from our servers.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>What happens to my invoices if I cancel?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        On the Free plan, invoices are stored for 7 days. On paid plans, invoices are stored forever. If you cancel your Pro subscription, you'll move to Free plan, and <strong>invoices older than 7 days will be archived</strong> (not deleted). If you resubscribe, all your data is restored.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>Can I export my data?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        Yes! From your dashboard, you can download all your invoices as PDFs or export your invoice data as CSV for use in Excel or accounting software.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>Do you have an API?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        API access is available on the <strong>Business plan</strong>. This lets you integrate InvoiceEase with your own tools, CRM, or accounting software. Contact us for API documentation.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact CTA -->
+        <div class="contact-cta">
+            <h3>Still have questions?</h3>
+            <p>Our support team is here to help!</p>
+            <a href="mailto:support@invoiceease.in" class="contact-button">Contact Support</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2026 InvoiceEase. Made with ❤️ for Indian freelancers.</p>
+    </footer>
+
+    <script>
+        function toggleFAQ(element) {
+            const faqItem = element.parentElement;
+            const isActive = faqItem.classList.contains('active');
+            
+            // Close all other FAQs
+            document.querySelectorAll('.faq-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Open clicked FAQ if it wasn't active
+            if (!isActive) {
+                faqItem.classList.add('active');
+            }
+        }
+        
+        function searchFAQs() {
+            const searchInput = document.getElementById('searchInput');
+            const filter = searchInput.value.toLowerCase();
+            const faqItems = document.querySelectorAll('.faq-item');
+            
+            faqItems.forEach(item => {
+                const question = item.querySelector('.faq-question span').textContent.toLowerCase();
+                const answer = item.querySelector('.faq-answer-content').textContent.toLowerCase();
+                
+                if (question.includes(filter) || answer.includes(filter)) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

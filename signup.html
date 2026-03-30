@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - InvoiceEase</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0F6E56;
+            --primary-light: #1D9E75;
+            --primary-dark: #085041;
+            --accent: #EF9F27;
+            --bg: #FAFAF8;
+            --surface: #FFFFFF;
+            --text: #1A1A1A;
+            --text-muted: #666666;
+            --border: #E5E5E0;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        
+        h1, h2, h3 {
+            font-family: 'Sora', sans-serif;
+            line-height: 1.2;
+        }
+        
+        /* Header */
+        header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 1.5rem 2rem;
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-family: 'Sora', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+        
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+        }
+        
+        .back-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.3s;
+        }
+        
+        .back-link:hover {
+            color: var(--primary);
+        }
+        
+        /* Main Container */
+        .signup-container {
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 0 2rem 60px;
+        }
+        
+        .signup-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .signup-header h1 {
+            font-size: 36px;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .signup-header p {
+            color: var(--text-muted);
+            font-size: 16px;
+        }
+        
+        /* Form */
+        .signup-form {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+        }
+        
+        .form-section {
+            margin-bottom: 32px;
+        }
+        
+        .form-section:last-child {
+            margin-bottom: 0;
+        }
+        
+        .section-title {
+            font-family: 'Sora', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--primary);
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+        
+        label .required {
+            color: #E24B4A;
+        }
+        
+        .helper-text {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        
+        input, textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 15px;
+            transition: all 0.3s;
+        }
+        
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(15, 110, 86, 0.1);
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        
+        /* Buttons */
+        .submit-button {
+            width: 100%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Sora', sans-serif;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 32px;
+        }
+        
+        .submit-button:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(15, 110, 86, 0.2);
+        }
+        
+        /* Info Box */
+        .info-box {
+            background: rgba(29, 158, 117, 0.05);
+            border: 1px solid rgba(29, 158, 117, 0.2);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 24px;
+            font-size: 14px;
+            color: var(--text);
+        }
+        
+        .info-box strong {
+            color: var(--primary);
+        }
+        
+        /* Login Link */
+        .login-link {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+        
+        .login-link a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .login-link a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .signup-container {
+                margin: 20px auto;
+                padding: 0 1.5rem 40px;
+            }
+            
+            .signup-form {
+                padding: 24px;
+            }
+            
+            .signup-header h1 {
+                font-size: 28px;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="header-content">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">IE</div>
+                InvoiceEase
+            </a>
+            <a href="index.html" class="back-link">← Back to home</a>
+        </div>
+    </header>
+
+    <!-- Signup Container -->
+    <div class="signup-container">
+        <div class="signup-header">
+            <h1>Create Your Account</h1>
+            <p>Start generating professional invoices in minutes</p>
+        </div>
+
+        <form class="signup-form" id="signupForm">
+            <!-- Account Info -->
+            <div class="form-section">
+                <h3 class="section-title">Account Information</h3>
+                
+                <div class="form-group">
+                    <label for="email">Email <span class="required">*</span></label>
+                    <input type="email" id="email" name="email" required placeholder="you@example.com">
+                </div>
+                
+                <div class="form-group">
+                    <label for="whatsapp">WhatsApp Number <span class="required">*</span></label>
+                    <input type="tel" id="whatsapp" name="whatsapp" required placeholder="+91 98765 43210">
+                    <p class="helper-text">We'll send your invoices to this number</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password <span class="required">*</span></label>
+                    <input type="password" id="password" name="password" required placeholder="Minimum 8 characters">
+                </div>
+            </div>
+
+            <!-- Business Details -->
+            <div class="form-section">
+                <h3 class="section-title">Business Details</h3>
+                
+                <div class="form-group">
+                    <label for="businessName">Business/Your Name <span class="required">*</span></label>
+                    <input type="text" id="businessName" name="businessName" required placeholder="Acme Consulting">
+                    <p class="helper-text">This will appear on all your invoices</p>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="gstNumber">GST Number</label>
+                        <input type="text" id="gstNumber" name="gstNumber" placeholder="27XXXXX1234X1Z5">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="panNumber">PAN Number</label>
+                        <input type="text" id="panNumber" name="panNumber" placeholder="ABCDE1234F">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="address">Business Address</label>
+                    <textarea id="address" name="address" placeholder="123 Business Street, Area"></textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="city">City</label>
+                        <input type="text" id="city" name="city" placeholder="Mumbai">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="pincode">Pincode</label>
+                        <input type="text" id="pincode" name="pincode" placeholder="400001">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bank Details (Optional) -->
+            <div class="form-section">
+                <h3 class="section-title">Bank Details (Optional)</h3>
+                <div class="info-box">
+                    <strong>💡 Pro tip:</strong> Add your bank details now to include them on all invoices automatically. You can always add this later.
+                </div>
+                
+                <div class="form-group">
+                    <label for="bankName">Bank Name</label>
+                    <input type="text" id="bankName" name="bankName" placeholder="HDFC Bank">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="accountNumber">Account Number</label>
+                        <input type="text" id="accountNumber" name="accountNumber" placeholder="1234567890">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="ifscCode">IFSC Code</label>
+                        <input type="text" id="ifscCode" name="ifscCode" placeholder="HDFC0001234">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="upiId">UPI ID</label>
+                    <input type="text" id="upiId" name="upiId" placeholder="yourname@paytm">
+                </div>
+            </div>
+
+            <!-- Submit -->
+            <button type="submit" class="submit-button">Create Account & Start Free Trial</button>
+            
+            <div class="login-link">
+                Already have an account? <a href="login.html">Log in</a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('signupForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Collect form data
+            const formData = {
+                email: document.getElementById('email').value,
+                whatsapp: document.getElementById('whatsapp').value,
+                password: document.getElementById('password').value,
+                businessName: document.getElementById('businessName').value,
+                gstNumber: document.getElementById('gstNumber').value,
+                panNumber: document.getElementById('panNumber').value,
+                address: document.getElementById('address').value,
+                city: document.getElementById('city').value,
+                pincode: document.getElementById('pincode').value,
+                bankName: document.getElementById('bankName').value,
+                accountNumber: document.getElementById('accountNumber').value,
+                ifscCode: document.getElementById('ifscCode').value,
+                upiId: document.getElementById('upiId').value
+            };
+            
+            // TODO: Send to backend API
+            console.log('Form submitted:', formData);
+            
+            // For now, redirect to dashboard
+            alert('Account created successfully! Redirecting to dashboard...');
+            window.location.href = 'dashboard.html';
+        });
+    </script>
+</body>
+</html>
