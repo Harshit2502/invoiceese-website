@@ -8,7 +8,7 @@ const userRoutes = require('./routes/users');
 const whatsappRoutes = require('./routes/whatsapp');
 
 // PostgreSQL initialization (optional - disabled by default)
-if (process.env.USE_POSTGRES === 'true' && process.env.DB_HOST) {
+if (process.env.USE_POSTGRES === 'true' && (process.env.DATABASE_URL || process.env.DB_HOST)) {
   try {
     const { initializeDatabase } = require('./db-postgres');
     initializeDatabase().then(() => {

@@ -1,0 +1,16 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Build output
+client/build/
+dist/
+
+# Runtime artifacts
+pdfs/
+*.log
+node_modules

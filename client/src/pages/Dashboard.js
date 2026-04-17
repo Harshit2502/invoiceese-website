@@ -71,6 +71,7 @@ export default function Dashboard() {
   const [statusUpdating, setStatusUpdating] = useState(null);
   const [settingsError, setSettingsError] = useState('');
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const [logoUploadPayload, setLogoUploadPayload] = useState(null);
   const [whatsAppStatus, setWhatsAppStatus] = useState(null);
   const [whatsAppLoading, setWhatsAppLoading] = useState(true);
   const [whatsAppError, setWhatsAppError] = useState('');
@@ -246,7 +247,9 @@ export default function Dashboard() {
     }
     const reader = new FileReader();
     reader.onload = () => {
-      setSettingsForm((prev) => ({ ...prev, logoUrl: String(reader.result || '') }));
+      const dataUrl = String(reader.result || '');
+      setSettingsForm((prev) => ({ ...prev, logoUrl: dataUrl }));
+      setLogoUploadPayload({ dataUrl, fileName: file.name || 'logo.png' });
       setSettingsError('');
     };
     reader.onerror = () => setSettingsError('Could not read the selected logo file');
@@ -255,6 +258,7 @@ export default function Dashboard() {
 
   const removeLogo = () => {
     setSettingsForm((prev) => ({ ...prev, logoUrl: '' }));
+    setLogoUploadPayload(null);
   };
 
   const handleSaveSettings = async (e) => {
@@ -262,9 +266,21 @@ export default function Dashboard() {
     setSettingsError('');
     setSettingsSaved(false);
     try {
+      let nextLogoUrl = settingsForm.logoUrl;
+
+      if (logoUploadPayload?.dataUrl) {
+        const uploadRes = await authFetch('/api/users/upload-logo', {
+          method: 'POST',
+          body: JSON.stringify(logoUploadPayload),
+        });
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok) throw new Error(uploadData.error || 'Logo upload failed');
+        nextLogoUrl = uploadData.logoUrl || nextLogoUrl;
+      }
+
       const profileRes = await authFetch('/api/users/profile', {
         method: 'PATCH',
-        body: JSON.stringify({ logoUrl: settingsForm.logoUrl }),
+        body: JSON.stringify({ logoUrl: nextLogoUrl }),
       });
       const profileData = await profileRes.json();
       if (!profileRes.ok) throw new Error(profileData.error);
@@ -279,6 +295,8 @@ export default function Dashboard() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setUser(data.user || profileData.user);
+      setSettingsForm((prev) => ({ ...prev, logoUrl: nextLogoUrl }));
+      setLogoUploadPayload(null);
       setSettingsSaved(true);
       setTimeout(() => setSettingsSaved(false), 2000);
     } catch (err) {
@@ -552,7 +570,7 @@ export default function Dashboard() {
                     <button type="button" className="btn btn-secondary" onClick={() => setShowSettings(false)}>Cancel</button>
                     <button type="submit" className="btn btn-primary">Save Settings</button>
                   </div>
-                </form>
+                </form> 
               </div>
             </div>
           )}
