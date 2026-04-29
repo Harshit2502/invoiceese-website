@@ -10,7 +10,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "CI=false npx react-scripts build"
+    "build": "chmod +x node_modules/.bin/react-scripts && react-scripts build"
   },
   "proxy": "http://localhost:5000",
   "browserslist": {
