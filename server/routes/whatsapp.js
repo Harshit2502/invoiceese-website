@@ -6,8 +6,17 @@ const db = require('../db');
 const authMiddleware = require('../middleware/auth');
 const { normalizeWhatsAppNumber } = require('../utils/whatsapp');
 
-const WHATSAPP_TOKEN = process.env.WHATSAPP_API_KEY || process.env.WHATSAPP_ACCESS_TOKEN;
-const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+const WHATSAPP_PROVIDER = (process.env.WHATSAPP_PROVIDER || 'meta').toLowerCase();
+
+// Meta Cloud API config
+const META_WHATSAPP_TOKEN = process.env.WHATSAPP_API_KEY || process.env.WHATSAPP_ACCESS_TOKEN;
+const META_WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+// Gupshup config
+const GUPSHUP_API_KEY = process.env.GUPSHUP_API_KEY;
+const GUPSHUP_APP_NAME = process.env.GUPSHUP_APP_NAME;
+const GUPSHUP_SOURCE_NUMBER = normalizeWhatsAppNumber(process.env.GUPSHUP_SOURCE_NUMBER || '');
+
 const WHATSAPP_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'invoiceease-whatsapp-token';
 const WHATSAPP_PUBLIC_NUMBER = process.env.WHATSAPP_PUBLIC_NUMBER || process.env.REACT_APP_WHATSAPP_NUMBER || '';
 
@@ -123,15 +132,18 @@ const resetConversationMemory = (whatsappNumber) => {
   }
 };
 
-// WhatsApp Business API helpers
-const sendWhatsAppMessage = async (to, text) => {
+const isMetaConfigured = () => Boolean(META_WHATSAPP_TOKEN && META_WHATSAPP_PHONE_NUMBER_ID);
+const isGupshupConfigured = () => Boolean(GUPSHUP_API_KEY && GUPSHUP_SOURCE_NUMBER);
+const isProviderConfigured = () => (WHATSAPP_PROVIDER === 'gupshup' ? isGupshupConfigured() : isMetaConfigured());
+
+const sendMetaWhatsAppMessage = async (to, text) => {
   const normalizedTo = normalizeWhatsAppNumber(to);
-  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
-    console.warn('WhatsApp not configured: message not sent');
+  if (!isMetaConfigured()) {
+    console.warn('Meta WhatsApp is not configured: message not sent');
     return;
   }
 
-  const url = `https://graph.facebook.com/v17.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+  const url = `https://graph.facebook.com/v17.0/${META_WHATSAPP_PHONE_NUMBER_ID}/messages`;
   const payload = {
     messaging_product: 'whatsapp',
     to: normalizedTo,
@@ -144,7 +156,7 @@ const sendWhatsAppMessage = async (to, text) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+        Authorization: `Bearer ${META_WHATSAPP_TOKEN}`,
       },
       body: JSON.stringify(payload),
     });
@@ -154,8 +166,101 @@ const sendWhatsAppMessage = async (to, text) => {
       console.error('WhatsApp message error:', response.status, body);
     }
   } catch (err) {
-    console.error('WhatsApp message failed:', err);
+    console.error('Meta WhatsApp message failed:', err);
   }
+};
+
+const sendGupshupWhatsAppMessage = async (to, text) => {
+  const normalizedTo = normalizeWhatsAppNumber(to);
+  if (!isGupshupConfigured()) {
+    console.warn('Gupshup is not configured: message not sent');
+    return;
+  }
+
+  const messagePayload = JSON.stringify({ type: 'text', text });
+  const body = new URLSearchParams();
+  body.set('channel', 'whatsapp');
+  body.set('source', GUPSHUP_SOURCE_NUMBER);
+  body.set('destination', normalizedTo);
+  body.set('message', messagePayload);
+  if (GUPSHUP_APP_NAME) {
+    body.set('src.name', GUPSHUP_APP_NAME);
+  }
+
+  try {
+    const response = await fetch('https://api.gupshup.io/wa/api/v1/msg', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        apikey: GUPSHUP_API_KEY,
+      },
+      body: body.toString(),
+    });
+
+    if (!response.ok) {
+      const bodyText = await response.text();
+      console.error('Gupshup message error:', response.status, bodyText);
+    }
+  } catch (err) {
+    console.error('Gupshup message failed:', err);
+  }
+};
+
+// WhatsApp transport wrapper (provider switch)
+const sendWhatsAppMessage = async (to, text) => {
+  if (WHATSAPP_PROVIDER === 'gupshup') {
+    return sendGupshupWhatsAppMessage(to, text);
+  }
+  return sendMetaWhatsAppMessage(to, text);
+};
+
+const extractMetaMessages = (body) => {
+  if (!body || !Array.isArray(body.entry)) return [];
+  const messages = [];
+  for (const entry of body.entry) {
+    if (!entry.changes) continue;
+    for (const change of entry.changes) {
+      if (!change.value || !Array.isArray(change.value.messages)) continue;
+      for (const msg of change.value.messages) {
+        const from = normalizeWhatsAppNumber(msg.from);
+        let text = '';
+
+        if (msg.type === 'text') text = msg.text?.body || '';
+        if (msg.type === 'button') text = msg.button?.text || msg.button?.payload || '';
+        if (msg.type === 'interactive') {
+          text = msg.interactive?.button_reply?.title || msg.interactive?.list_reply?.title || '';
+        }
+
+        if (from && text) messages.push({ from, text });
+      }
+    }
+  }
+  return messages;
+};
+
+const extractGupshupMessages = (body) => {
+  const normalized = typeof body?.payload === 'string'
+    ? { ...body, payload: (() => { try { return JSON.parse(body.payload); } catch { return null; } })() }
+    : body;
+
+  const payload = normalized?.payload;
+  if (!payload) return [];
+
+  const from = normalizeWhatsAppNumber(payload.source || payload.sender?.phone || payload.sender?.id || '');
+
+  let text = '';
+  if (payload.type === 'text') {
+    text = payload.payload?.text || payload.text || '';
+  } else if (payload.type === 'button_reply') {
+    text = payload.payload?.title || payload.payload?.text || '';
+  } else if (payload.type === 'list_reply') {
+    text = payload.payload?.title || payload.payload?.text || '';
+  } else {
+    text = payload.payload?.text || payload.text || '';
+  }
+
+  if (!from || !text) return [];
+  return [{ from, text }];
 };
 
 const handleWhatsAppText = async (whatsappNumber, text) => {
@@ -529,6 +634,11 @@ const processMessage = async (whatsappNumber, userMessage) => {
 
 // Webhook verification endpoint required by WhatsApp Business API
 router.get('/webhook', (req, res) => {
+  if (WHATSAPP_PROVIDER === 'gupshup') {
+    // Gupshup may call GET webhook as connectivity probe.
+    return res.status(200).send('OK');
+  }
+
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
@@ -544,53 +654,32 @@ router.get('/webhook', (req, res) => {
 // Main WhatsApp webhook: receives messages from WhatsApp Business API
 router.post('/webhook', async (req, res) => {
   try {
-    const body = req.body;
+    const body = req.body || {};
+    const incomingMessages = WHATSAPP_PROVIDER === 'gupshup'
+      ? extractGupshupMessages(body)
+      : extractMetaMessages(body);
 
-    if (!body || !body.entry || !Array.isArray(body.entry)) {
-      return res.status(400).send('Invalid payload');
+    if (!incomingMessages.length) {
+      return res.status(200).send('EVENT_RECEIVED');
     }
 
-    const messages = [];
-    for (const entry of body.entry) {
-      if (!entry.changes) continue;
-      for (const change of entry.changes) {
-        if (!change.value || !change.value.messages) continue;
-        for (const msg of change.value.messages) {
-          messages.push(msg);
-        }
-      }
-    }
-
-    for (const msg of messages) {
-      const from = normalizeWhatsAppNumber(msg.from);
-      let userMessage = '';
-
-      if (msg.type === 'text') {
-        userMessage = msg.text?.body || '';
-      } else if (msg.type === 'button') {
-        userMessage = msg.button?.text || msg.button?.payload || '';
-      } else if (msg.type === 'interactive') {
-        userMessage = msg.interactive?.button_reply?.title || msg.interactive?.list_reply?.title || '';
-      }
-
-      if (!from || !userMessage) continue;
-
-      const response = await processMessage(from, userMessage);
+    for (const incoming of incomingMessages) {
+      const response = await processMessage(incoming.from, incoming.text);
 
       if (response.error) {
-        await sendWhatsAppMessage(from, '⚠️ ' + response.error);
+        await sendWhatsAppMessage(incoming.from, '⚠️ ' + response.error);
       } else {
         if (response.reply) {
-          await sendWhatsAppMessage(from, response.reply);
+          await sendWhatsAppMessage(incoming.from, response.reply);
         }
 
         if (response.text) {
-          await sendWhatsAppMessage(from, response.text);
+          await sendWhatsAppMessage(incoming.from, response.text);
         }
 
         if (response.document && response.document.url) {
           // For now respond with a link (WhatsApp template file messages require advanced API)
-          await sendWhatsAppMessage(from, `Your invoice is ready: ${response.document.url}`);
+          await sendWhatsAppMessage(incoming.from, `Your invoice is ready: ${response.document.url}`);
         }
       }
     }
@@ -661,9 +750,12 @@ router.get('/user/:whatsapp', async (req, res) => {
 
 router.get('/status', (req, res) => {
   res.json({
-    configured: Boolean(WHATSAPP_TOKEN && WHATSAPP_PHONE_NUMBER_ID),
+    provider: WHATSAPP_PROVIDER,
+    configured: isProviderConfigured(),
     webhookVerifyTokenConfigured: Boolean(WHATSAPP_VERIFY_TOKEN),
-    phoneNumberIdConfigured: Boolean(WHATSAPP_PHONE_NUMBER_ID),
+    phoneNumberIdConfigured: Boolean(META_WHATSAPP_PHONE_NUMBER_ID),
+    metaConfigured: isMetaConfigured(),
+    gupshupConfigured: isGupshupConfigured(),
     publicNumber: WHATSAPP_PUBLIC_NUMBER || null,
     webhookPath: '/api/whatsapp/webhook',
   });

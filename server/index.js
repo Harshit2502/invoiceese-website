@@ -5,7 +5,8 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const invoiceRoutes = require('./routes/invoices');
 const userRoutes = require('./routes/users');
-const whatsappRoutes = require('./routes/whatsapp');
+const telegramRoutes = require('./routes/telegram');
+const paymentRoutes = require('./routes/payments');
 
 // PostgreSQL initialization (optional - disabled by default)
 if (process.env.USE_POSTGRES === 'true' && (process.env.DATABASE_URL || process.env.DB_HOST)) {
@@ -27,14 +28,21 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:3000', credentials: true }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', authRoutes);
 
 // Public PDF route (no auth required)
-app.get('/api/pdf/:id', (req, res) => {
-  const db = require('./db');
-  const invoice = db.invoices.find(inv => inv.id === req.params.id);
+app.get('/api/pdf/:id', async (req, res) => {
+  let invoice = null;
+  if (process.env.USE_POSTGRES === 'true') {
+    const pgFunctions = require('./db-postgres');
+    invoice = await pgFunctions.getInvoiceById(req.params.id);
+  } else {
+    const db = require('./db');
+    invoice = db.invoices.find(inv => inv.id === req.params.id);
+  }
   if (!invoice) {
     return res.status(404).json({ error: 'Invoice not found' });
   }
@@ -61,7 +69,8 @@ app.get('/api/pdf/:id', (req, res) => {
 
 app.use('/api/invoices', invoiceRoutes); // Authenticated routes
 app.use('/api/users', userRoutes);
-app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/telegram', telegramRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

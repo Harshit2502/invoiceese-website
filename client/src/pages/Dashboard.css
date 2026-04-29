@@ -61,8 +61,8 @@
 .stat-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
 .whatsapp-panel {
-  background: linear-gradient(180deg, rgba(37, 211, 102, 0.08) 0%, rgba(255, 255, 255, 0.98) 100%);
-  border: 1px solid rgba(37, 211, 102, 0.2);
+  background: linear-gradient(180deg, rgba(0, 136, 204, 0.08) 0%, rgba(255, 255, 255, 0.98) 100%);
+  border: 1px solid rgba(0, 136, 204, 0.2);
   border-radius: var(--radius-xl);
   padding: 24px;
   margin-bottom: 28px;

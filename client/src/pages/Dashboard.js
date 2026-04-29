@@ -4,8 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import './Dashboard.css';
 
-const WHATSAPP_LINK_NUMBER = (process.env.REACT_APP_WHATSAPP_NUMBER || '917666522600').replace(/[^0-9]/g, '');
-const WHATSAPP_START_TEXT = encodeURIComponent('new invoice');
+const TELEGRAM_BOT_USERNAME = process.env.REACT_APP_TELEGRAM_BOT || 'InvoiceEaseBot';
 
 function StatCard({ label, value, sub }) {
   return (
@@ -72,11 +71,12 @@ export default function Dashboard() {
   const [settingsError, setSettingsError] = useState('');
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [logoUploadPayload, setLogoUploadPayload] = useState(null);
-  const [whatsAppStatus, setWhatsAppStatus] = useState(null);
-  const [whatsAppLoading, setWhatsAppLoading] = useState(true);
-  const [whatsAppError, setWhatsAppError] = useState('');
-  const [whatsAppTestSending, setWhatsAppTestSending] = useState(false);
-  const [whatsAppTestMessage, setWhatsAppTestMessage] = useState('');
+  const [telegramStatus, setTelegramStatus] = useState(null);
+  const [telegramLoading, setTelegramLoading] = useState(true);
+  const [telegramError, setTelegramError] = useState('');
+  const [telegramTestSending, setTelegramTestSending] = useState(false);
+  const [telegramTestMessage, setTelegramTestMessage] = useState('');
+  const [payingInvoiceId, setPayingInvoiceId] = useState(null);
   const [settingsForm, setSettingsForm] = useState({ 
     templateStyle: user?.templateStyle || 'modern', 
     showWatermark: user?.showWatermark !== false,
@@ -100,21 +100,21 @@ export default function Dashboard() {
   useEffect(() => { loadInvoices(); }, [loadInvoices]);
 
   useEffect(() => {
-    const loadWhatsAppStatus = async () => {
+    const loadTelegramStatus = async () => {
       try {
-        setWhatsAppLoading(true);
-        setWhatsAppError('');
-        const response = await fetch('/api/whatsapp/status');
+        setTelegramLoading(true);
+        setTelegramError('');
+        const response = await fetch('/api/telegram/status');
         const data = await response.json();
-        setWhatsAppStatus(data);
+        setTelegramStatus(data);
       } catch (error) {
-        setWhatsAppError('Could not load WhatsApp integration status');
+        setTelegramError('Could not load Telegram integration status');
       } finally {
-        setWhatsAppLoading(false);
+        setTelegramLoading(false);
       }
     };
 
-    loadWhatsAppStatus();
+    loadTelegramStatus();
   }, []);
 
   useEffect(() => {
@@ -124,6 +124,21 @@ export default function Dashboard() {
       logoUrl: user?.logoUrl || '',
     });
   }, [user]);
+
+  useEffect(() => {
+    if (window.Razorpay) return;
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    document.body.appendChild(script);
+
+    return () => {
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
+  }, []);
 
   const handleCreateChange = e => setCreateForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
@@ -304,21 +319,93 @@ export default function Dashboard() {
     }
   };
 
-  const handleSendWhatsAppTest = async () => {
-    setWhatsAppTestSending(true);
-    setWhatsAppTestMessage('');
+  const handleSendTelegramTest = async () => {
+    setTelegramTestSending(true);
+    setTelegramTestMessage('');
     try {
-      const response = await authFetch('/api/whatsapp/test-send', {
+      const response = await authFetch('/api/telegram/test-send', {
         method: 'POST',
         body: JSON.stringify({}),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to send test message');
-      setWhatsAppTestMessage(`Test message sent to ${data.to}`);
+      setTelegramTestMessage(`Test message sent to chat ${data.chatId}`);
     } catch (error) {
-      setWhatsAppTestMessage(error.message);
+      setTelegramTestMessage(error.message);
     } finally {
-      setWhatsAppTestSending(false);
+      setTelegramTestSending(false);
+    }
+  };
+
+  const handlePayInvoice = async (invoice) => {
+    if (!window.Razorpay) {
+      window.alert('Razorpay SDK is not loaded yet. Please refresh and try again.');
+      return;
+    }
+
+    setPayingInvoiceId(invoice.id);
+    try {
+      const orderRes = await authFetch('/api/payments/razorpay/order', {
+        method: 'POST',
+        body: JSON.stringify({ invoiceId: invoice.id }),
+      });
+      const orderData = await orderRes.json();
+      if (!orderRes.ok) throw new Error(orderData.error || 'Failed to create payment order');
+
+      const options = {
+        key: orderData.key,
+        amount: orderData.order.amount,
+        currency: orderData.order.currency,
+        name: user?.businessName || 'InvoiceEase',
+        description: `Payment for ${invoice.invoiceNumber}`,
+        order_id: orderData.order.id,
+        prefill: {
+          name: user?.businessName || '',
+          email: user?.email || '',
+        },
+        notes: {
+          invoiceNumber: invoice.invoiceNumber,
+          invoiceId: invoice.id,
+        },
+        theme: {
+          color: '#0f6e56',
+        },
+        handler: async function (response) {
+          const verifyRes = await authFetch('/api/payments/razorpay/verify', {
+            method: 'POST',
+            body: JSON.stringify({
+              invoiceId: invoice.id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+
+          const verifyData = await verifyRes.json();
+          if (!verifyRes.ok) {
+            throw new Error(verifyData.error || 'Payment verification failed');
+          }
+
+          setInvoices((prev) => {
+            const nextInvoices = prev.map((inv) => (inv.id === invoice.id ? verifyData.invoice : inv));
+            setStats(deriveStatsFromInvoices(nextInvoices));
+            return nextInvoices;
+          });
+
+          window.alert('Payment successful and invoice marked as paid.');
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.on('payment.failed', function (response) {
+        const reason = response?.error?.description || 'Payment failed';
+        window.alert(reason);
+      });
+      razorpay.open();
+    } catch (error) {
+      window.alert(error.message || 'Could not start payment.');
+    } finally {
+      setPayingInvoiceId(null);
     }
   };
 
@@ -367,52 +454,52 @@ export default function Dashboard() {
           <div className="whatsapp-panel">
             <div className="whatsapp-panel-header">
               <div>
-                <h2>WhatsApp Integration</h2>
-                <p>Connect Meta Cloud API and test message delivery from the dashboard.</p>
+                <h2>Telegram Integration</h2>
+                <p>Connect your Telegram bot and create invoices via chat.</p>
               </div>
-              <a href={`https://wa.me/${WHATSAPP_LINK_NUMBER}?text=${WHATSAPP_START_TEXT}`} target="_blank" rel="noreferrer" className="btn btn-whatsapp btn-sm">
-                Open Chat
+              <a href={`https://t.me/${TELEGRAM_BOT_USERNAME}`} target="_blank" rel="noreferrer" className="btn btn-whatsapp btn-sm">
+                Open Telegram Bot
               </a>
             </div>
 
-            {whatsAppLoading ? (
-              <div className="whatsapp-status-row">Loading WhatsApp status...</div>
-            ) : whatsAppError ? (
-              <div className="alert alert-error">{whatsAppError}</div>
+            {telegramLoading ? (
+              <div className="whatsapp-status-row">Loading Telegram status...</div>
+            ) : telegramError ? (
+              <div className="alert alert-error">{telegramError}</div>
             ) : (
               <>
                 <div className="whatsapp-status-grid">
                   <div className="whatsapp-status-card">
-                    <span className={`status-dot ${whatsAppStatus?.configured ? 'dot-paid' : 'dot-overdue'}`} />
+                    <span className={`status-dot ${telegramStatus?.configured ? 'dot-paid' : 'dot-overdue'}`} />
                     <div>
-                      <strong>{whatsAppStatus?.configured ? 'Connected' : 'Not configured'}</strong>
-                      <p>{whatsAppStatus?.configured ? 'Token and Phone Number ID detected' : 'Add token and phone number ID in server env'}</p>
+                      <strong>{telegramStatus?.configured ? 'Connected' : 'Not configured'}</strong>
+                      <p>{telegramStatus?.configured ? 'Bot token detected' : 'Add TELEGRAM_BOT_TOKEN in server env'}</p>
                     </div>
                   </div>
                   <div className="whatsapp-status-card">
-                    <strong>Saved user number</strong>
-                    <p>{user?.whatsapp || 'No WhatsApp number saved in profile'}</p>
+                    <strong>Linked Telegram</strong>
+                    <p>{user?.telegram_chat_id || 'No Telegram account linked'}</p>
                   </div>
                   <div className="whatsapp-status-card">
-                    <strong>Public chat number</strong>
-                    <p>{whatsAppStatus?.publicNumber || WHATSAPP_LINK_NUMBER || 'Not set'}</p>
+                    <strong>Bot username</strong>
+                    <p>@{TELEGRAM_BOT_USERNAME}</p>
                   </div>
                   <div className="whatsapp-status-card">
                     <strong>Webhook endpoint</strong>
-                    <p>{whatsAppStatus?.webhookPath || '/api/whatsapp/webhook'}</p>
+                    <p>{telegramStatus?.webhookPath || '/api/telegram/webhook'}</p>
                   </div>
                 </div>
 
                 <div className="whatsapp-actions-row">
-                  <button className="btn btn-primary btn-sm" type="button" onClick={handleSendWhatsAppTest} disabled={!whatsAppStatus?.configured || !user?.whatsapp || whatsAppTestSending}>
-                    {whatsAppTestSending ? 'Sending...' : 'Send Test Message'}
+                  <button className="btn btn-primary btn-sm" type="button" onClick={handleSendTelegramTest} disabled={!telegramStatus?.configured || !user?.telegram_chat_id || telegramTestSending}>
+                    {telegramTestSending ? 'Sending...' : 'Send Test Message'}
                   </button>
                   <Link to="/pricing" className="btn btn-secondary btn-sm">View Plan Benefits</Link>
                 </div>
 
-                {whatsAppTestMessage && (
-                  <div className={`alert ${whatsAppTestMessage.startsWith('Test message sent') ? 'alert-success' : 'alert-error'}`}>
-                    {whatsAppTestMessage}
+                {telegramTestMessage && (
+                  <div className={`alert ${telegramTestMessage.startsWith('Test message sent') ? 'alert-success' : 'alert-error'}`}>
+                    {telegramTestMessage}
                   </div>
                 )}
               </>
@@ -579,8 +666,8 @@ export default function Dashboard() {
           <div className="invoice-panel">
             <div className="panel-header">
               <h2>Recent Invoices</h2>
-              <a href={`https://wa.me/${WHATSAPP_LINK_NUMBER}?text=${WHATSAPP_START_TEXT}`} target="_blank" rel="noreferrer" className="btn btn-whatsapp btn-sm">
-                📱 Create via WhatsApp
+              <a href={`https://t.me/${TELEGRAM_BOT_USERNAME}`} target="_blank" rel="noreferrer" className="btn btn-whatsapp btn-sm">
+                📱 Create via Telegram
               </a>
             </div>
 
@@ -633,6 +720,15 @@ export default function Dashboard() {
                             <a className="btn btn-sm action-btn" href={inv.pdfUrl} target="_blank" rel="noreferrer">PDF</a>
                           ) : (
                             <span className="text-muted">No PDF</span>
+                          )}
+                          {inv.status !== 'paid' && (
+                            <button
+                              className="btn btn-sm btn-primary"
+                              onClick={() => handlePayInvoice(inv)}
+                              disabled={payingInvoiceId === inv.id}
+                            >
+                              {payingInvoiceId === inv.id ? 'Processing...' : 'Pay Now'}
+                            </button>
                           )}
                           <button className="btn btn-sm action-btn" onClick={() => deleteInvoice(inv.id)}>Delete</button>
                         </td>

@@ -4,11 +4,18 @@ const publicRouter = express.Router(); // Public routes without auth
 const { v4: uuidv4 } = require('uuid');
 const authMiddleware = require('../middleware/auth');
 const db = require('../db');
+const { sendInvoiceEmail } = require('../services/email');
 
 // Public routes (no auth required)
-publicRouter.get('/pdf/:id', (req, res) => {
+publicRouter.get('/pdf/:id', async (req, res) => {
   console.log('PDF route hit for ID:', req.params.id);
-  const invoice = db.invoices.find(inv => inv.id === req.params.id);
+  let invoice = null;
+  if (process.env.USE_POSTGRES === 'true') {
+    const pgFunctions = require('../db-postgres');
+    invoice = await pgFunctions.getInvoiceById(req.params.id);
+  } else {
+    invoice = db.invoices.find(inv => inv.id === req.params.id);
+  }
   if (!invoice) {
     return res.status(404).json({ error: 'Invoice not found' });
   }
@@ -37,10 +44,17 @@ publicRouter.get('/pdf/:id', (req, res) => {
 router.use(authMiddleware);
 
 // GET /api/invoices - list user's invoices
-router.get('/', (req, res) => {
-  const invoices = db.invoices
-    .filter(inv => inv.userId === req.userId)
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
+router.get('/', async (req, res) => {
+  let userInvoices = [];
+  if (process.env.USE_POSTGRES === 'true') {
+    const pgFunctions = require('../db-postgres');
+    userInvoices = await pgFunctions.getUserInvoices(req.userId);
+  } else {
+    userInvoices = db.invoices.filter(inv => inv.userId === req.userId);
+  }
+
+  const invoices = userInvoices
+    .sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt))
     .map((inv) => {
       const safeAmount = Number(inv.amount) || 0;
       const normalizedItems = Array.isArray(inv.items) && inv.items.length > 0
@@ -86,7 +100,13 @@ router.get('/', (req, res) => {
 
 // POST /api/invoices - create new invoice
 router.post('/', async (req, res) => {
-  const user = db.users.find(u => u.id === req.userId);
+  let user = null;
+  if (process.env.USE_POSTGRES === 'true') {
+    const pgFunctions = require('../db-postgres');
+    user = await pgFunctions.getUserById(req.userId);
+  } else {
+    user = db.users.find(u => u.id === req.userId);
+  }
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   // All plans now have unlimited invoices
@@ -137,9 +157,15 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'GST rate must be a valid non-negative number' });
   }
 
-  const userInvoices = db.invoices.filter(inv => inv.userId === req.userId);
-  const invoiceNum = userInvoices.length + 1;
-  const invoiceNumber = `INV-${String(invoiceNum).padStart(3, '0')}`;
+  let invoiceNumber;
+  if (process.env.USE_POSTGRES === 'true') {
+    const pgFunctions = require('../db-postgres');
+    invoiceNumber = await pgFunctions.getNextInvoiceNumber(req.userId);
+  } else {
+    const userInvoices = db.invoices.filter(inv => inv.userId === req.userId);
+    const invoiceNum = userInvoices.length + 1;
+    invoiceNumber = `INV-${String(invoiceNum).padStart(3, '0')}`;
+  }
 
   const gstAmount = Number(((parsedAmount * parsedGstRate) / 100).toFixed(2));
   const totalAmount = Number((parsedAmount + gstAmount).toFixed(2));
@@ -169,8 +195,15 @@ router.post('/', async (req, res) => {
   };
 
   // Generate PDF for the invoice
+  let pdfResult = null;
   try {
-    const userMeta = db.users.find(u => u.id === req.userId);
+    let userMeta = null;
+    if (process.env.USE_POSTGRES === 'true') {
+      const pgFunctions = require('../db-postgres');
+      userMeta = await pgFunctions.getUserById(req.userId);
+    } else {
+      userMeta = db.users.find(u => u.id === req.userId);
+    }
     const { generateInvoicePDF } = require('../pdf-generator');
 
     const pdfPayload = {
@@ -185,22 +218,41 @@ router.post('/', async (req, res) => {
       gstApplicable: parsedGstRate > 0,
     };
 
-    const pdfResult = await generateInvoicePDF(pdfPayload, userMeta || {});
+    pdfResult = await generateInvoicePDF(pdfPayload, userMeta || {});
     invoice.pdfUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/pdf/${invoice.id}`;
   } catch (err) {
     console.error('Failed to generate invoice PDF:', err);
     invoice.pdfUrl = null;
   }
 
-  db.invoices.push(invoice);
-  user.invoicesThisMonth = (user.invoicesThisMonth || 0) + 1;
+  if (process.env.USE_POSTGRES === 'true') {
+    const pgFunctions = require('../db-postgres');
+    await pgFunctions.createInvoice(invoice);
+    await pgFunctions.updateUser(user.id, { invoices_this_month: (user.invoicesThisMonth || 0) + 1 });
+  } else {
+    db.invoices.push(invoice);
+    user.invoicesThisMonth = (user.invoicesThisMonth || 0) + 1;
+  }
+
+  // Send email via Resend
+  if (invoice.pdfUrl && pdfResult && pdfResult.filePath) {
+    sendInvoiceEmail(user.email, clientName, invoice, pdfResult.filePath)
+      .catch(err => console.error('Background email failed:', err));
+  }
 
   res.status(201).json({ invoice, message: 'Invoice created successfully' });
 });
 
 // PATCH /api/invoices/:id/status - update payment status
-router.patch('/:id/status', (req, res) => {
-  const invoice = db.invoices.find(inv => inv.id === req.params.id && inv.userId === req.userId);
+router.patch('/:id/status', async (req, res) => {
+  let invoice = null;
+  if (process.env.USE_POSTGRES === 'true') {
+    const pgFunctions = require('../db-postgres');
+    invoice = await pgFunctions.getInvoiceById(req.params.id);
+    if (invoice && invoice.userId !== req.userId) invoice = null;
+  } else {
+    invoice = db.invoices.find(inv => inv.id === req.params.id && inv.userId === req.userId);
+  }
   if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
 
   const { status } = req.body;
@@ -208,21 +260,38 @@ router.patch('/:id/status', (req, res) => {
     return res.status(400).json({ error: 'Status must be paid, unpaid, or overdue' });
   }
 
+  if (process.env.USE_POSTGRES === 'true') {
+    const pgFunctions = require('../db-postgres');
+    await pgFunctions.updateInvoiceStatus(invoice.id, status);
+  }
   invoice.status = status;
   res.json({ invoice, message: 'Status updated' });
 });
 
 // DELETE /api/invoices/:id
-router.delete('/:id', (req, res) => {
-  const idx = db.invoices.findIndex(inv => inv.id === req.params.id && inv.userId === req.userId);
-  if (idx === -1) return res.status(404).json({ error: 'Invoice not found' });
-  db.invoices.splice(idx, 1);
+router.delete('/:id', async (req, res) => {
+  if (process.env.USE_POSTGRES === 'true') {
+    const pgFunctions = require('../db-postgres');
+    const invoice = await pgFunctions.getInvoiceById(req.params.id);
+    if (!invoice || invoice.userId !== req.userId) return res.status(404).json({ error: 'Invoice not found' });
+    await pgFunctions.deleteInvoice(req.params.id);
+  } else {
+    const idx = db.invoices.findIndex(inv => inv.id === req.params.id && inv.userId === req.userId);
+    if (idx === -1) return res.status(404).json({ error: 'Invoice not found' });
+    db.invoices.splice(idx, 1);
+  }
   res.json({ message: 'Invoice deleted' });
 });
 
 // GET /api/invoices/:id/pdf - download PDF (public access for WhatsApp downloads)
-publicRouter.get('/:id/pdf', (req, res) => {
-  const invoice = db.invoices.find(inv => inv.id === req.params.id);
+publicRouter.get('/:id/pdf', async (req, res) => {
+  let invoice = null;
+  if (process.env.USE_POSTGRES === 'true') {
+    const pgFunctions = require('../db-postgres');
+    invoice = await pgFunctions.getInvoiceById(req.params.id);
+  } else {
+    invoice = db.invoices.find(inv => inv.id === req.params.id);
+  }
   if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
 
   const fs = require('fs');

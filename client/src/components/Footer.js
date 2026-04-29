@@ -11,7 +11,7 @@ export default function Footer() {
             <div className="logo-icon">IE</div>
             InvoiceEase
           </div>
-          <p>GST invoices in 30 seconds via WhatsApp. Built for Indian freelancers.</p>
+          <p>GST invoices in 30 seconds via Telegram. Built for Indian freelancers.</p>
         </div>
 
         <div className="footer-links">

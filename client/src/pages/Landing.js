@@ -5,17 +5,17 @@ import Footer from '../components/Footer';
 import './Landing.css';
 
 const features = [
-  { icon: '⚡', title: 'Instant generation', desc: 'No forms to fill. Just send a WhatsApp message and get your invoice in 30 seconds.' },
+  { icon: '⚡', title: 'Instant generation', desc: 'No forms to fill. Just send a Telegram message and get your invoice in 30 seconds.' },
   { icon: '✓', title: 'GST compliant', desc: 'Automatic CGST & SGST calculations. All invoices follow Indian tax regulations perfectly.' },
   { icon: '💼', title: 'Professional look', desc: 'Beautiful templates with your logo and branding. Make a great impression on every client.' },
-  { icon: '📱', title: 'No app needed', desc: 'Works entirely on WhatsApp. Your clients can access invoices instantly on any device.' },
+  { icon: '📱', title: 'No app needed', desc: 'Works entirely on Telegram. Your clients can access invoices instantly on any device.' },
   { icon: '🔒', title: 'Secure storage', desc: 'All invoices saved securely in the cloud. Access them anytime, from anywhere.' },
   { icon: '📊', title: 'Track payments', desc: 'See which invoices are paid and pending. Keep your finances organised effortlessly.' },
 ];
 
 const steps = [
   { n: '1', title: 'Sign up and set up', desc: 'Create your account in 2 minutes. Add your business name, GST number, and bank details once.' },
-  { n: '2', title: 'WhatsApp your invoice', desc: 'Send a message like "Invoice for Acme Corp, ₹50,000, Website Design" to our number.' },
+  { n: '2', title: 'Message our Telegram bot', desc: 'Send a message like "Invoice for Acme Corp, ₹50,000, Website Design" to our bot.' },
   { n: '3', title: 'Get your PDF instantly', desc: 'Within 30 seconds, receive a professional GST-compliant invoice as a PDF. Download and share!' },
 ];
 
@@ -30,7 +30,7 @@ export default function Landing() {
           <div className="hero-content">
             <div className="hero-badge">🇮🇳 Built for Indian freelancers</div>
             <h1>GST Invoices in<br /><span className="gradient-text">30 Seconds</span></h1>
-            <p>Stop wasting time on invoices. Just WhatsApp your details and get a professional, GST-compliant invoice instantly.</p>
+            <p>Stop wasting time on invoices. Just message our Telegram bot with your details and get a professional, GST-compliant invoice instantly.</p>
             <div className="hero-buttons">
               <Link to="/signup" className="btn btn-primary btn-lg">Get Started Free</Link>
               <Link to="#how-it-works" className="btn btn-secondary btn-lg">See How It Works</Link>
@@ -47,7 +47,7 @@ export default function Landing() {
           <div className="hero-demo">
             <div className="demo-header">
               <div className="demo-dot red" /><div className="demo-dot yellow" /><div className="demo-dot green" />
-              <span className="demo-title">WhatsApp</span>
+              <span className="demo-title">Telegram</span>
             </div>
             <div className="whatsapp-mockup">
               <div className="wa-message user">Invoice for Acme Corp, ₹50,000, Website Design</div>
@@ -126,7 +126,7 @@ export default function Landing() {
                 <li>✓ 5 invoices per month</li>
                 <li>✓ GST compliant</li>
                 <li>✓ Basic template</li>
-                <li>✓ WhatsApp support</li>
+                <li>✓ Telegram support</li>
               </ul>
               <Link to="/signup" className="btn btn-secondary btn-block" style={{ marginTop: 24 }}>Start Free</Link>
             </div>

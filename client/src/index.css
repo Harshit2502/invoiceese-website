@@ -12,7 +12,7 @@
   --success: #639922;
   --warning: #EF9F27;
   --danger: #E24B4A;
-  --whatsapp: #25D366;
+  --telegram: #0088cc;
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -97,13 +97,13 @@ img { max-width: 100%; }
 }
 
 .btn-whatsapp {
-  background: var(--whatsapp);
+  background: var(--telegram);
   color: white;
 }
 .btn-whatsapp:hover {
-  background: #1FB855;
+  background: #006da3;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(37,211,102,0.3);
+  box-shadow: 0 4px 12px rgba(0,136,204,0.3);
 }
 
 .btn-lg { padding: 16px 40px; font-size: 17px; }

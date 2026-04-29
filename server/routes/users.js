@@ -3,12 +3,15 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const db = require('../db');
 const { normalizeWhatsAppNumber } = require('../utils/whatsapp');
-const supabase = require('../utils/supabase');
+const { getSupabaseClient } = require('../utils/supabase');
 const path = require('path');
 
 // Helper: upload base64 dataURL to Supabase Storage and return public URL
 async function uploadDataUrlToSupabase(bucket, destPath, dataUrl) {
-  if (!supabase) throw new Error('Supabase client not configured');
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    throw new Error('Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
+  }
   const matches = dataUrl.match(/^data:(.+);base64,(.*)$/);
   if (!matches) throw new Error('Invalid data URL');
   const contentType = matches[1];
@@ -29,7 +32,13 @@ router.use(authMiddleware);
 
 // POST /api/users/upload-logo
 router.post('/upload-logo', async (req, res) => {
-  const user = db.users.find(u => u.id === req.userId);
+  let user = null;
+  if (process.env.USE_POSTGRES === 'true') {
+    const pgFunctions = require('../db-postgres');
+    user = await pgFunctions.getUserById(req.userId);
+  } else {
+    user = db.users.find(u => u.id === req.userId);
+  }
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   const { dataUrl, fileName } = req.body;
@@ -41,6 +50,10 @@ router.post('/upload-logo', async (req, res) => {
 
   try {
     const publicUrl = await uploadDataUrlToSupabase(bucket, destPath, dataUrl);
+    if (process.env.USE_POSTGRES === 'true') {
+      const pgFunctions = require('../db-postgres');
+      await pgFunctions.updateUser(user.id, { logoUrl: publicUrl });
+    }
     user.logoUrl = publicUrl;
     const { passwordHash: _, ...userSafe } = user;
     res.json({ user: userSafe, logoUrl: publicUrl });
@@ -51,16 +64,28 @@ router.post('/upload-logo', async (req, res) => {
 });
 
 // GET /api/users/profile
-router.get('/profile', (req, res) => {
-  const user = db.users.find(u => u.id === req.userId);
+router.get('/profile', async (req, res) => {
+  let user = null;
+  if (process.env.USE_POSTGRES === 'true') {
+    const pgFunctions = require('../db-postgres');
+    user = await pgFunctions.getUserById(req.userId);
+  } else {
+    user = db.users.find(u => u.id === req.userId);
+  }
   if (!user) return res.status(404).json({ error: 'User not found' });
   const { passwordHash: _, ...userSafe } = user;
   res.json({ user: userSafe });
 });
 
 // PATCH /api/users/profile
-router.patch('/profile', (req, res) => {
-  const user = db.users.find(u => u.id === req.userId);
+router.patch('/profile', async (req, res) => {
+  let user = null;
+  if (process.env.USE_POSTGRES === 'true') {
+    const pgFunctions = require('../db-postgres');
+    user = await pgFunctions.getUserById(req.userId);
+  } else {
+    user = db.users.find(u => u.id === req.userId);
+  }
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   if (req.body.whatsapp !== undefined) {
@@ -68,7 +93,14 @@ router.patch('/profile', (req, res) => {
     if (!normalizedWhatsApp) {
       return res.status(400).json({ error: 'WhatsApp number is invalid' });
     }
-    const exists = db.users.find(u => u.id !== req.userId && normalizeWhatsAppNumber(u.whatsapp) === normalizedWhatsApp);
+    let exists = null;
+    if (process.env.USE_POSTGRES === 'true') {
+      const pgFunctions = require('../db-postgres');
+      const waUser = await pgFunctions.getUserByWhatsApp(normalizedWhatsApp);
+      if (waUser && waUser.id !== req.userId) exists = waUser;
+    } else {
+      exists = db.users.find(u => u.id !== req.userId && normalizeWhatsAppNumber(u.whatsapp) === normalizedWhatsApp);
+    }
     if (exists) {
       return res.status(409).json({ error: 'WhatsApp number already in use' });
     }
@@ -76,14 +108,25 @@ router.patch('/profile', (req, res) => {
   }
 
   const allowed = ['businessName', 'gstNumber', 'panNumber', 'address', 'city', 'pincode', 'bankName', 'accountNumber', 'ifscCode', 'upiId', 'whatsapp', 'logoUrl', 'templateStyle', 'showWatermark'];
-  allowed.forEach(field => {
-    if (req.body[field] !== undefined) user[field] = req.body[field];
-  });
-
-  // Validate premium features based on plan
-  if (user.plan === 'free') {
-    user.showWatermark = true; // Force watermark on free plan
-    // user.templateStyle = 'modern'; // Only modern template for free
+  
+  if (process.env.USE_POSTGRES === 'true') {
+    const pgFunctions = require('../db-postgres');
+    const updates = {};
+    allowed.forEach(field => {
+      if (req.body[field] !== undefined) updates[field] = req.body[field];
+    });
+    if (user.plan === 'free') updates.showWatermark = true;
+    if (Object.keys(updates).length > 0) {
+      await pgFunctions.updateUser(user.id, updates);
+      Object.assign(user, updates);
+    }
+  } else {
+    allowed.forEach(field => {
+      if (req.body[field] !== undefined) user[field] = req.body[field];
+    });
+    if (user.plan === 'free') {
+      user.showWatermark = true;
+    }
   }
 
   const { passwordHash: _, ...userSafe } = user;
@@ -91,8 +134,14 @@ router.patch('/profile', (req, res) => {
 });
 
 // POST /api/users/settings - update premium settings
-router.post('/settings', (req, res) => {
-  const user = db.users.find(u => u.id === req.userId);
+router.post('/settings', async (req, res) => {
+  let user = null;
+  if (process.env.USE_POSTGRES === 'true') {
+    const pgFunctions = require('../db-postgres');
+    user = await pgFunctions.getUserById(req.userId);
+  } else {
+    user = db.users.find(u => u.id === req.userId);
+  }
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   const { templateStyle, showWatermark } = req.body;
@@ -105,6 +154,11 @@ router.post('/settings', (req, res) => {
   // Only Pro+ plans can remove watermark
   if (showWatermark !== undefined && user.plan !== 'free') {
     user.showWatermark = showWatermark;
+  }
+
+  if (process.env.USE_POSTGRES === 'true') {
+    const pgFunctions = require('../db-postgres');
+    await pgFunctions.updateUser(user.id, { templateStyle: user.templateStyle, showWatermark: user.showWatermark });
   }
 
   const { passwordHash: _, ...userSafe } = user;
