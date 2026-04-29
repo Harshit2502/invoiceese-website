@@ -606,6 +606,28 @@ router.post('/set-webhook', authMiddleware, async (req, res) => {
   }
 });
 
+// --- One-time auto-setup webhook (visit in browser to register) ---
+router.get('/setup-webhook', async (req, res) => {
+  try {
+    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const webhookUrl = `${baseUrl}/api/telegram/webhook`;
+
+    const response = await fetch(`${TELEGRAM_API_URL}/setWebhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: webhookUrl }),
+    });
+
+    const result = await response.json();
+    console.log('Telegram setWebhook result:', result);
+
+    res.json({ success: result.ok, webhookUrl, result });
+  } catch (err) {
+    console.error('Failed to set Telegram webhook:', err);
+    res.status(500).json({ error: 'Failed to set webhook' });
+  }
+});
+
 // --- Get webhook info ---
 router.get('/webhook-info', async (req, res) => {
   try {
