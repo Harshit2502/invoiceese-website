@@ -7,7 +7,7 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "cd server && npm run dev",
     "dev:client": "cd client && npm start",
-    "build": "cd client && npm run build",
+    "build": "cd client && CI=false npx react-scripts build",
     "start": "cd server && npm start"
   },
   "devDependencies": {

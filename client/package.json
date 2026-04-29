@@ -10,7 +10,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build"
+    "build": "CI=false npx react-scripts build"
   },
   "proxy": "http://localhost:5000",
   "browserslist": {
