@@ -362,11 +362,23 @@ const processMessage = async (chatId, userMessage, baseUrlOverride) => {
     // Format: /start email@example.com
     if (lowerMsg.startsWith('/start ') && userMessage.trim().split(' ').length === 2) {
       const email = userMessage.trim().split(' ')[1];
-      const matchedUser = db.users.find(
-        (u) => u.email && u.email.toLowerCase() === email.toLowerCase() && !u.telegram_chat_id
-      );
+      let matchedUser = null;
+
+      if (USE_POSTGRES) {
+        matchedUser = await pgFunctions.getUserByEmail(email.toLowerCase());
+        if (matchedUser && matchedUser.telegram_chat_id) matchedUser = null; // already linked
+      } else {
+        matchedUser = db.users.find(
+          (u) => u.email && u.email.toLowerCase() === email.toLowerCase() && !u.telegram_chat_id
+        );
+      }
+
       if (matchedUser) {
-        matchedUser.telegram_chat_id = String(chatId);
+        if (USE_POSTGRES) {
+          await pgFunctions.updateUser(matchedUser.id, { telegram_chat_id: String(chatId) });
+        } else {
+          matchedUser.telegram_chat_id = String(chatId);
+        }
         user = matchedUser;
         console.log(`✅ Auto-linked Telegram chat ${chatId} to user ${user.email}`);
       } else {
@@ -378,20 +390,13 @@ const processMessage = async (chatId, userMessage, baseUrlOverride) => {
         };
       }
     } else {
-      // Auto-link to the first unlinked user (single-user convenience for dev/testing)
-      const unlinkedUser = db.users.find((u) => !u.telegram_chat_id);
-      if (unlinkedUser) {
-        unlinkedUser.telegram_chat_id = String(chatId);
-        user = unlinkedUser;
-        console.log(`✅ Auto-linked Telegram chat ${chatId} to user ${user.email || user.businessName}`);
-      } else {
-        return {
-          reply:
-            `👋 Welcome! Your Telegram isn't linked to an InvoiceEase account yet.\n\n` +
-            `Please sign up at invoiceease.in first, then send:\n` +
-            `/start your@email.com`,
-        };
-      }
+      return {
+        reply:
+          `👋 Welcome to *InvoiceEase*!\n\n` +
+          `To link your Telegram account, send:\n` +
+          `/start your@email.com\n\n` +
+          `(Use the email you signed up with at invoiceease.in)`,
+      };
     }
   }
 
