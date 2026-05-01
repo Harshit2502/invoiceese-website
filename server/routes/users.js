@@ -91,7 +91,7 @@ router.patch('/profile', async (req, res) => {
   if (req.body.whatsapp !== undefined) {
     const normalizedWhatsApp = normalizeWhatsAppNumber(req.body.whatsapp);
     if (!normalizedWhatsApp) {
-      return res.status(400).json({ error: 'WhatsApp number is invalid' });
+      return res.status(400).json({ error: 'Phone number is invalid' });
     }
     let exists = null;
     if (process.env.USE_POSTGRES === 'true') {
@@ -102,7 +102,7 @@ router.patch('/profile', async (req, res) => {
       exists = db.users.find(u => u.id !== req.userId && normalizeWhatsAppNumber(u.whatsapp) === normalizedWhatsApp);
     }
     if (exists) {
-      return res.status(409).json({ error: 'WhatsApp number already in use' });
+      return res.status(409).json({ error: 'Phone number already in use' });
     }
     req.body.whatsapp = normalizedWhatsApp;
   }

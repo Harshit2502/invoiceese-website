@@ -98,7 +98,7 @@ export default function Signup() {
               required
             />
             <SignupField
-              label="WhatsApp Number"
+              label="Phone Number"
               name="whatsapp"
               type="tel"
               value={form.whatsapp}

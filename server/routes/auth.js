@@ -19,7 +19,7 @@ router.post('/signup', async (req, res) => {
     const normalizedWhatsApp = normalizeWhatsAppNumber(whatsapp);
 
     if (!normalizedEmail || !password || !businessName || !normalizedWhatsApp) {
-      return res.status(400).json({ error: 'Email, WhatsApp, password, and business name are required' });
+      return res.status(400).json({ error: 'Email, Phone number, password, and business name are required' });
     }
 
     let existing = null;
@@ -29,7 +29,7 @@ router.post('/signup', async (req, res) => {
     } else {
       existing = db.users.find(u => u.email === normalizedEmail || normalizeWhatsAppNumber(u.whatsapp) === normalizedWhatsApp);
     }
-    if (existing) return res.status(409).json({ error: 'Email or WhatsApp already registered' });
+    if (existing) return res.status(409).json({ error: 'Email or Phone number already registered' });
 
     const passwordHash = await bcrypt.hash(password, 10);
     const newUser = {

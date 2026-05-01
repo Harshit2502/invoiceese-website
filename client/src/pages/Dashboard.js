@@ -451,46 +451,46 @@ export default function Dashboard() {
             <StatCard label="Pending" value={formatAmount(stats.pending || 0)} sub={`${stats.pendingCount || 0} invoice${stats.pendingCount !== 1 ? 's' : ''}`} />
           </div>
 
-          <div className="whatsapp-panel">
-            <div className="whatsapp-panel-header">
+          <div className="telegram-panel">
+            <div className="telegram-panel-header">
               <div>
                 <h2>Telegram Integration</h2>
                 <p>Connect your Telegram bot and create invoices via chat.</p>
               </div>
-              <a href={`https://t.me/${TELEGRAM_BOT_USERNAME}`} target="_blank" rel="noreferrer" className="btn btn-whatsapp btn-sm">
+              <a href={`https://t.me/${TELEGRAM_BOT_USERNAME}`} target="_blank" rel="noreferrer" className="btn btn-telegram btn-sm">
                 Open Telegram Bot
               </a>
             </div>
 
             {telegramLoading ? (
-              <div className="whatsapp-status-row">Loading Telegram status...</div>
+              <div className="telegram-status-row">Loading Telegram status...</div>
             ) : telegramError ? (
               <div className="alert alert-error">{telegramError}</div>
             ) : (
               <>
-                <div className="whatsapp-status-grid">
-                  <div className="whatsapp-status-card">
+                <div className="telegram-status-grid">
+                  <div className="telegram-status-card">
                     <span className={`status-dot ${telegramStatus?.configured ? 'dot-paid' : 'dot-overdue'}`} />
                     <div>
                       <strong>{telegramStatus?.configured ? 'Connected' : 'Not configured'}</strong>
                       <p>{telegramStatus?.configured ? 'Bot token detected' : 'Add TELEGRAM_BOT_TOKEN in server env'}</p>
                     </div>
                   </div>
-                  <div className="whatsapp-status-card">
+                  <div className="telegram-status-card">
                     <strong>Linked Telegram</strong>
                     <p>{user?.telegram_chat_id || 'No Telegram account linked'}</p>
                   </div>
-                  <div className="whatsapp-status-card">
+                  <div className="telegram-status-card">
                     <strong>Bot username</strong>
                     <p>@{TELEGRAM_BOT_USERNAME}</p>
                   </div>
-                  <div className="whatsapp-status-card">
+                  <div className="telegram-status-card">
                     <strong>Webhook endpoint</strong>
                     <p>{telegramStatus?.webhookPath || '/api/telegram/webhook'}</p>
                   </div>
                 </div>
 
-                <div className="whatsapp-actions-row">
+                <div className="telegram-actions-row">
                   <button className="btn btn-primary btn-sm" type="button" onClick={handleSendTelegramTest} disabled={!telegramStatus?.configured || !user?.telegram_chat_id || telegramTestSending}>
                     {telegramTestSending ? 'Sending...' : 'Send Test Message'}
                   </button>
@@ -666,7 +666,7 @@ export default function Dashboard() {
           <div className="invoice-panel">
             <div className="panel-header">
               <h2>Recent Invoices</h2>
-              <a href={`https://t.me/${TELEGRAM_BOT_USERNAME}`} target="_blank" rel="noreferrer" className="btn btn-whatsapp btn-sm">
+              <a href={`https://t.me/${TELEGRAM_BOT_USERNAME}`} target="_blank" rel="noreferrer" className="btn btn-telegram btn-sm">
                 📱 Create via Telegram
               </a>
             </div>

@@ -109,8 +109,9 @@ router.post('/', async (req, res) => {
   }
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  // All plans now have unlimited invoices
-  // (Free plan no longer has per-month limits)
+  if (user.plan === 'free' && (user.invoicesThisMonth || 0) >= 5) {
+    return res.status(403).json({ error: 'Free plan limit reached (5 invoices/month). Please upgrade.' });
+  }
 
   const { clientName, service, amount, items, gstRate = 18, notes, dueDate, templateStyle } = req.body;
   if (!clientName) {
@@ -283,7 +284,7 @@ router.delete('/:id', async (req, res) => {
   res.json({ message: 'Invoice deleted' });
 });
 
-// GET /api/invoices/:id/pdf - download PDF (public access for WhatsApp downloads)
+// GET /api/invoices/:id/pdf - download PDF (public access for Telegram downloads)
 publicRouter.get('/:id/pdf', async (req, res) => {
   let invoice = null;
   if (process.env.USE_POSTGRES === 'true') {

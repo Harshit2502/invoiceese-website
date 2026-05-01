@@ -60,7 +60,7 @@
 
 .stat-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
-.whatsapp-panel {
+.telegram-panel {
   background: linear-gradient(180deg, rgba(0, 136, 204, 0.08) 0%, rgba(255, 255, 255, 0.98) 100%);
   border: 1px solid rgba(0, 136, 204, 0.2);
   border-radius: var(--radius-xl);
@@ -68,7 +68,7 @@
   margin-bottom: 28px;
 }
 
-.whatsapp-panel-header {
+.telegram-panel-header {
   display: flex;
   justify-content: space-between;
   gap: 16px;
@@ -76,26 +76,26 @@
   margin-bottom: 18px;
 }
 
-.whatsapp-panel-header h2 {
+.telegram-panel-header h2 {
   font-size: 20px;
   margin-bottom: 4px;
 }
 
-.whatsapp-panel-header p,
-.whatsapp-status-card p,
-.whatsapp-status-row {
+.telegram-panel-header p,
+.telegram-status-card p,
+.telegram-status-row {
   color: var(--text-muted);
   font-size: 14px;
 }
 
-.whatsapp-status-grid {
+.telegram-status-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 16px;
 }
 
-.whatsapp-status-card {
+.telegram-status-card {
   background: rgba(255,255,255,0.86);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -105,12 +105,12 @@
   align-items: flex-start;
 }
 
-.whatsapp-status-card strong {
+.telegram-status-card strong {
   display: block;
   margin-bottom: 4px;
 }
 
-.whatsapp-actions-row {
+.telegram-actions-row {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
@@ -279,8 +279,8 @@
   .stats-grid { grid-template-columns: 1fr 1fr; }
   .dash-header { flex-direction: column; gap: 16px; }
   .panel-header { flex-direction: column; align-items: stretch; gap: 12px; }
-  .whatsapp-panel-header { flex-direction: column; }
-  .whatsapp-status-grid { grid-template-columns: 1fr; }
+  .telegram-panel-header { flex-direction: column; }
+  .telegram-status-grid { grid-template-columns: 1fr; }
   .modal-card { padding: 24px 20px; }
   .invoice-table { font-size: 13px; }
   .invoice-table th, .invoice-table td { padding: 10px; }

@@ -18,7 +18,7 @@ export default function Terms() {
           <p>Welcome to InvoiceEase. These Terms of Service ("Terms") govern your use of our service. By using InvoiceEase, you agree to these Terms.</p>
 
           <h2>1. Service Description</h2>
-          <p>InvoiceEase is a WhatsApp-based invoice generation platform that helps freelancers and businesses create GST-compliant invoices instantly. Our service includes WhatsApp-based invoice generation, GST-compliant PDF creation, cloud storage, dashboard management, and payment tracking.</p>
+          <p>InvoiceEase is a Telegram-based invoice generation platform that helps freelancers and businesses create GST-compliant invoices instantly. Our service includes Telegram-based invoice generation, GST-compliant PDF creation, cloud storage, dashboard management, and payment tracking.</p>
 
           <h2>2. Account Registration</h2>
           <p>To use InvoiceEase, you must be at least 18 years old, provide accurate registration information, maintain the security of your credentials, notify us immediately of any unauthorised access, and accept responsibility for all activities under your account.</p>
@@ -42,7 +42,7 @@ export default function Terms() {
           <p>While InvoiceEase generates GST-compliant invoice templates, you are responsible for providing accurate information, ensuring compliance with applicable tax laws, consulting a tax professional for specific advice, and all invoice numbering and GST calculations based on information you provide.</p>
 
           <h2>6. Data and Privacy</h2>
-          <p>Your use of InvoiceEase is subject to our Privacy Policy. We collect and store business details, client information, and invoice data. WhatsApp messages are processed and immediately deleted from our servers. Invoice PDFs are stored securely. We do not sell or share your personal data with third parties for marketing.</p>
+          <p>Your use of InvoiceEase is subject to our Privacy Policy. We collect and store business details, client information, and invoice data. Telegram messages are processed and immediately deleted from our servers. Invoice PDFs are stored securely. We do not sell or share your personal data with third parties for marketing.</p>
 
           <h2>7. Intellectual Property</h2>
           <p>InvoiceEase and all its original content are owned by us and protected by applicable laws. You may not copy, modify, reverse engineer our software, or remove copyright notices (except watermark removal on paid plans).</p>

@@ -96,11 +96,11 @@ img { max-width: 100%; }
   box-shadow: 0 8px 16px rgba(239,159,39,0.3);
 }
 
-.btn-whatsapp {
+.btn-telegram {
   background: var(--telegram);
   color: white;
 }
-.btn-whatsapp:hover {
+.btn-telegram:hover {
   background: #006da3;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0,136,204,0.3);

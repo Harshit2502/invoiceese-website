@@ -23,7 +23,7 @@ export default function Privacy() {
 
           <h2>1. Information We Collect</h2>
           <h3>Account Information</h3>
-          <p>Email address, WhatsApp number, hashed password, and profile details you provide during signup.</p>
+          <p>Email address, Phone number, hashed password, and profile details you provide during signup.</p>
           <h3>Business Information</h3>
           <p>Business name, GST number, PAN number, address, and bank details you provide for invoice generation.</p>
           <h3>Invoice Data</h3>
@@ -34,14 +34,14 @@ export default function Privacy() {
           <h2>2. How We Use Your Information</h2>
           <p>We use your information to provide and improve the InvoiceEase service, generate invoices on your behalf, send account-related notifications, provide customer support, detect and prevent fraud, and comply with legal obligations.</p>
 
-          <h2>3. WhatsApp Messages</h2>
-          <p>When you send invoice requests via WhatsApp, your messages are processed by our AI to extract invoice details. Messages are deleted from our servers within 24 hours of processing. We do not store your WhatsApp conversation history.</p>
+          <h2>3. Telegram Messages</h2>
+          <p>When you send invoice requests via Telegram, your messages are processed by our AI to extract invoice details. Messages are deleted from our servers within 24 hours of processing. We do not store your Telegram conversation history.</p>
 
           <h2>4. Data Storage and Security</h2>
           <p>Your data is stored on secure cloud servers with industry-standard 256-bit SSL encryption. We implement access controls, regular security audits, and follow data minimisation principles. Invoice PDFs are stored for the duration of your plan (7 days on Free, lifetime on paid plans).</p>
 
           <h2>5. Third-Party Services</h2>
-          <p>InvoiceEase integrates with: <strong>Razorpay</strong> for payment processing, <strong>WhatsApp/Gupshup</strong> for message delivery, <strong>AWS/Cloudflare</strong> for cloud hosting and file storage, and <strong>OpenAI</strong> for invoice parsing (only invoice text is sent, not your business details). Each has their own privacy policy.</p>
+          <p>InvoiceEase integrates with: <strong>Razorpay</strong> for payment processing, <strong>Telegram</strong> for message delivery, <strong>AWS/Cloudflare</strong> for cloud hosting and file storage, and <strong>OpenAI</strong> for invoice parsing (only invoice text is sent, not your business details). Each has their own privacy policy.</p>
 
           <h2>6. Your Rights</h2>
           <p>You have the right to access all personal data we hold about you, correct inaccurate data, download your data in a portable format (CSV/JSON), delete your account and all associated data, opt out of marketing communications, and withdraw consent at any time.</p>

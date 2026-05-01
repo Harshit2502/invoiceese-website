@@ -4,6 +4,7 @@ const fetch = require('node-fetch');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
 const authMiddleware = require('../middleware/auth');
+const { normalizeWhatsAppNumber } = require('../utils/whatsapp');
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
@@ -237,6 +238,11 @@ const generateInvoice = async (chatId, conversation, baseUrlOverride) => {
     return { error: 'User not found' };
   }
 
+  if (user.plan === 'free' && (user.invoicesThisMonth || 0) >= 5) {
+    await resetConversation(chatId);
+    return { reply: '❌ Free plan limit reached (5 invoices/month). Please upgrade at invoiceease.in to create more invoices.' };
+  }
+
   const parsedAmount = Number(data.item_qty) * Number(data.item_price);
   const parsedGstRate = Number(data.gst_rate) || 0;
   const gstAmount = Number(((parsedAmount * parsedGstRate) / 100).toFixed(2));
@@ -358,18 +364,28 @@ const processMessage = async (chatId, userMessage, baseUrlOverride) => {
   if (!user) {
     const lowerMsg = userMessage.toLowerCase().trim();
 
-    // Try to auto-link if user sends /start with their email
-    // Format: /start email@example.com
+    // Try to auto-link if user sends /start with their phone number
+    // Format: /start +919876543210
     if (lowerMsg.startsWith('/start ') && userMessage.trim().split(' ').length === 2) {
-      const email = userMessage.trim().split(' ')[1];
+      const phoneInput = userMessage.trim().split(' ')[1];
+      const normalizedPhone = normalizeWhatsAppNumber(phoneInput);
       let matchedUser = null;
 
+      if (!normalizedPhone) {
+        return {
+          reply:
+            `❌ Invalid phone number format.\n\n` +
+            `Please send it like this:\n` +
+            `/start +919876543210`,
+        };
+      }
+
       if (USE_POSTGRES) {
-        matchedUser = await pgFunctions.getUserByEmail(email.toLowerCase());
+        matchedUser = await pgFunctions.getUserByWhatsApp(normalizedPhone);
         if (matchedUser && matchedUser.telegram_chat_id) matchedUser = null; // already linked
       } else {
         matchedUser = db.users.find(
-          (u) => u.email && u.email.toLowerCase() === email.toLowerCase() && !u.telegram_chat_id
+          (u) => u.whatsapp && normalizeWhatsAppNumber(u.whatsapp) === normalizedPhone && !u.telegram_chat_id
         );
       }
 
@@ -384,9 +400,9 @@ const processMessage = async (chatId, userMessage, baseUrlOverride) => {
       } else {
         return {
           reply:
-            `❌ No account found for that email, or it's already linked.\n\n` +
+            `❌ No account found for that phone number, or it's already linked.\n\n` +
             `Please sign up at invoiceease.in first, then send:\n` +
-            `/start your@email.com`,
+            `/start +919876543210`,
         };
       }
     } else {
@@ -394,8 +410,8 @@ const processMessage = async (chatId, userMessage, baseUrlOverride) => {
         reply:
           `👋 Welcome to *InvoiceEase*!\n\n` +
           `To link your Telegram account, send:\n` +
-          `/start your@email.com\n\n` +
-          `(Use the email you signed up with at invoiceease.in)`,
+          `/start +919876543210\n\n` +
+          `(Use the phone number you signed up with at invoiceease.in)`,
       };
     }
   }

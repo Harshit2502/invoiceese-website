@@ -7,16 +7,16 @@ const categories = [
   {
     title: 'Getting Started',
     items: [
-      { q: 'How do I create my first invoice?', a: 'After signing up, send a WhatsApp message in this format: "Invoice for [Client Name], ₹[Amount], [Service Description]". For example: "Invoice for Acme Corp, ₹50,000, Website Design". You\'ll receive a GST-compliant PDF within 30 seconds!' },
-      { q: 'Do I need to download an app?', a: 'No! Everything works through WhatsApp, which you already have. Just save our WhatsApp number and start sending invoice requests.' },
-      { q: 'What information do I need during signup?', a: 'You\'ll need your email, WhatsApp number, and business name. GST number, PAN, address, and bank details are optional but recommended — the more you provide, the more automatic your invoices become.' },
+      { q: 'How do I create my first invoice?', a: 'After signing up, send a Telegram message in this format: "Invoice for [Client Name], ₹[Amount], [Service Description]". For example: "Invoice for Acme Corp, ₹50,000, Website Design". You\'ll receive a GST-compliant PDF within 30 seconds!' },
+      { q: 'Do I need to download an app?', a: 'No! Everything works through Telegram, which you already have. Just start a chat with our Telegram bot and send invoice requests.' },
+      { q: 'What information do I need during signup?', a: 'You\'ll need your email, Phone number, and business name. GST number, PAN, address, and bank details are optional but recommended — the more you provide, the more automatic your invoices become.' },
     ],
   },
   {
     title: 'Using InvoiceEase',
     items: [
       { q: 'Can I send invoice requests in Hindi?', a: 'Yes! You can send requests in Hindi, Marathi, or English. Our AI understands all three languages, including voice notes. Example: "Sharma ji ke liye invoice banao, 50 hazaar, website design"' },
-      { q: 'How do I add multiple items to one invoice?', a: 'List all items in your WhatsApp message. For example: "Invoice for ABC Ltd, Item 1: ₹20K website design, Item 2: ₹10K SEO services, Item 3: ₹5K content writing".' },
+      { q: 'How do I add multiple items to one invoice?', a: 'List all items in your Telegram message. For example: "Invoice for ABC Ltd, Item 1: ₹20K website design, Item 2: ₹10K SEO services, Item 3: ₹5K content writing".' },
       { q: 'Can I customise the invoice template?', a: 'Pro and Business users get access to 3 professional templates and can upload their logo. Free users get one basic template.' },
       { q: 'Where can I see all my past invoices?', a: 'Log in to your dashboard to see all invoices. Download any as PDF, mark them paid/unpaid, and view analytics.' },
       { q: 'Can I edit an invoice after creation?', a: 'Invoices cannot be edited after creation (for accounting integrity). If you made a mistake, simply create a new invoice — this won\'t count against your monthly limit on paid plans.' },
@@ -42,7 +42,7 @@ const categories = [
   {
     title: 'Technical Questions',
     items: [
-      { q: 'Is my data secure?', a: 'Yes! We use bank-level 256-bit SSL encryption to protect your data. All invoices are stored securely in the cloud. We never share your data with third parties. WhatsApp messages are processed and immediately deleted from our servers.' },
+      { q: 'Is my data secure?', a: 'Yes! We use bank-level 256-bit SSL encryption to protect your data. All invoices are stored securely in the cloud. We never share your data with third parties. Telegram messages are processed and immediately deleted from our servers.' },
       { q: 'What happens to my invoices if I cancel?', a: 'On the Free plan, invoices are stored for 7 days. On paid plans, invoices are stored forever. If you cancel Pro, older invoices are archived (not deleted). Resubscribing restores all data.' },
       { q: 'Can I export my data?', a: 'Yes! From your dashboard, download all invoices as PDFs or export invoice data as CSV for use in Excel or accounting software.' },
       { q: 'Do you have an API?', a: 'API access is available on the Business plan. This lets you integrate InvoiceEase with your CRM, custom tools, or accounting software. Contact us for API documentation.' },

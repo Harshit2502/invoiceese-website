@@ -49,9 +49,9 @@ export default function Landing() {
               <div className="demo-dot red" /><div className="demo-dot yellow" /><div className="demo-dot green" />
               <span className="demo-title">Telegram</span>
             </div>
-            <div className="whatsapp-mockup">
-              <div className="wa-message user">Invoice for Acme Corp, ₹50,000, Website Design</div>
-              <div className="wa-message bot">
+            <div className="telegram-mockup">
+              <div className="tg-message user">Invoice for Acme Corp, ₹50,000, Website Design</div>
+              <div className="tg-message bot">
                 ✅ <strong>Invoice generated!</strong><br /><br />
                 Invoice #INV-001<br />
                 Client: Acme Corp<br />

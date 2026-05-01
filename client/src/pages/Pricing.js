@@ -8,7 +8,7 @@ const plans = [
   {
     name: 'Free', monthly: 0, yearly: 0,
     desc: 'Perfect for trying out InvoiceEase',
-    features: ['Unlimited invoices', 'WhatsApp invoicing', 'GST compliant', 'Basic modern template', '7-day storage'],
+    features: ['5 invoices/month', 'Telegram invoicing', 'GST compliant', 'Basic modern template', '7-day storage'],
     notIncluded: ['Premium templates (3)', 'Custom logo', 'Remove watermark', 'Payment tracking', 'Priority support'],
     cta: 'Start Free', ctaClass: 'btn-secondary', href: '/signup',
   },
@@ -16,7 +16,7 @@ const plans = [
     name: 'Pro', monthly: 199, yearly: 159,
     desc: 'For serious freelancers',
     featured: true,
-    features: ['Unlimited invoices', 'WhatsApp invoicing', 'GST compliant', '3 premium templates', 'Lifetime storage', 'Custom logo support', 'Remove watermark', 'Payment tracking', 'Priority email support'],
+    features: ['Unlimited invoices', 'Telegram invoicing', 'GST compliant', '3 premium templates', 'Lifetime storage', 'Custom logo support', 'Remove watermark', 'Payment tracking', 'Priority email support'],
     notIncluded: [],
     cta: 'Start Pro Trial', ctaClass: 'btn-primary', href: '/signup',
   },
@@ -30,8 +30,8 @@ const plans = [
 ];
 
 const comparison = [
-  { feature: 'Invoices', free: 'Unlimited', pro: 'Unlimited', business: 'Unlimited' },
-  { feature: 'WhatsApp invoicing', free: true, pro: true, business: true },
+  { feature: 'Invoices', free: '5/month', pro: 'Unlimited', business: 'Unlimited' },
+  { feature: 'Telegram invoicing', free: true, pro: true, business: true },
   { feature: 'GST compliant', free: true, pro: true, business: true },
   { feature: 'Invoice templates', free: '1 basic', pro: '3 premium', business: 'All' },
   { feature: 'Storage duration', free: '7 days', pro: 'Lifetime', business: 'Lifetime' },
@@ -52,7 +52,7 @@ const faqs = [
   { q: 'Can I get a refund?', a: 'We offer a 30-day money-back guarantee. If you\'re not satisfied, contact us within 30 days for a full refund, no questions asked.' },
   { q: 'Do you offer annual billing discounts?', a: 'Yes! Save 20% with annual billing — that\'s 2.4 months free on the Pro plan.' },
   { q: 'What storage duration do I get on Free plan?', a: 'On the Free plan, invoices are stored for 7 days. Upgrade to Pro for lifetime storage, custom templates, watermark removal, and more.' },
-  { q: 'Can I create unlimited invoices on the Free plan?', a: 'Yes! All plans now include unlimited invoice creation. The Free plan is perfect for getting started — the main differences are advanced templates, watermark removal, and storage duration.' },
+  { q: 'Can I create unlimited invoices on the Free plan?', a: 'The Free plan allows you to create up to 5 invoices per month. To create unlimited invoices, you can upgrade to the Pro plan, which also includes advanced templates, watermark removal, and lifetime storage.' },
 ];
 
 function CellVal({ val }) {

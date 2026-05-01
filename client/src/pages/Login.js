@@ -50,14 +50,14 @@ export default function Login() {
 
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label className="form-label">Email or WhatsApp Number</label>
+              <label className="form-label">Email</label>
               <input
                 className="form-input"
                 type="text"
                 name="email"
                 value={form.email}
                 onChange={handleChange}
-                placeholder="you@example.com or +91 98765 43210"
+                placeholder="you@example.com"
                 autoComplete="username"
                 autoCapitalize="none"
                 autoCorrect="off"
@@ -100,11 +100,6 @@ export default function Login() {
             </button>
           </form>
 
-          <div className="divider"><span>or</span></div>
-
-          <button className="btn btn-whatsapp btn-block" onClick={() => alert('WhatsApp login coming soon!')}>
-            <span>📱</span> Log in with WhatsApp
-          </button>
 
           <p className="auth-switch">
             Don't have an account? <Link to="/signup">Sign up for free</Link>
