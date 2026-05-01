@@ -26,6 +26,7 @@ const conversationStates = {
   WAITING_ITEM_DESC: 'waiting_item_desc',
   WAITING_ITEM_QTY: 'waiting_item_qty',
   WAITING_ITEM_PRICE: 'waiting_item_price',
+  WAITING_ADD_ANOTHER_ITEM: 'waiting_add_another_item',
   WAITING_GST_RATE: 'waiting_gst_rate',
   WAITING_NOTES: 'waiting_notes',
   WAITING_TEMPLATE: 'waiting_template',
@@ -240,10 +241,18 @@ const generateInvoice = async (chatId, conversation, baseUrlOverride) => {
 
   if (user.plan === 'free' && (user.invoicesThisMonth || 0) >= 5) {
     await resetConversation(chatId);
-    return { reply: '❌ Free plan limit reached (5 invoices/month). Please upgrade at invoiceease.in to create more invoices.' };
+    return { reply: '❌ Free plan limit reached (5 invoices/month). Please upgrade at www.invoiceease.org.in to create more invoices.' };
   }
 
-  const parsedAmount = Number(data.item_qty) * Number(data.item_price);
+  const normalizedItems = Array.isArray(data.items) && data.items.length > 0 
+    ? data.items 
+    : [{
+        description: data.item_desc,
+        quantity: data.item_qty,
+        unitPrice: data.item_price
+      }];
+
+  const parsedAmount = normalizedItems.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unitPrice)), 0);
   const parsedGstRate = Number(data.gst_rate) || 0;
   const gstAmount = Number(((parsedAmount * parsedGstRate) / 100).toFixed(2));
   const totalAmount = Number((parsedAmount + gstAmount).toFixed(2));
@@ -257,11 +266,6 @@ const generateInvoice = async (chatId, conversation, baseUrlOverride) => {
     invoiceNumber = `INV-${String(userInvoices.length + 1).padStart(3, '0')}`;
   }
 
-  const normalizedItems = [{
-    description: data.item_desc,
-    quantity: data.item_qty,
-    unitPrice: data.item_price
-  }];
 
   const requestedTemplateStyle = ['modern', 'minimal', 'classic', 'premium'].includes(data.template)
     ? data.template
@@ -274,7 +278,7 @@ const generateInvoice = async (chatId, conversation, baseUrlOverride) => {
     invoiceNumber,
     clientName: data.client_name,
     clientGst: '',
-    service: data.item_desc,
+    service: normalizedItems.length > 1 ? 'Multiple Items' : normalizedItems[0].description,
     items: normalizedItems,
     amount: parsedAmount,
     gstRate: parsedGstRate,
@@ -341,7 +345,7 @@ const generateInvoice = async (chatId, conversation, baseUrlOverride) => {
       (gstAmount ? `📊 GST (${parsedGstRate}%): ${formatINR(gstAmount)}\n` : '') +
       `💰 *Total: ${formatINR(totalAmount)}*\n\n` +
       (invoiceData.pdfUrl ? `📄 Download: ${invoiceData.pdfUrl}\n\n` : '') +
-      `💡 View all invoices at: invoiceease.in/dashboard\n\n` +
+      `💡 View all invoices at: www.invoiceease.org.in/dashboard\n\n` +
       `Want to create another invoice? Type /newinvoice`,
   };
 
@@ -401,7 +405,7 @@ const processMessage = async (chatId, userMessage, baseUrlOverride) => {
         return {
           reply:
             `❌ No account found for that phone number, or it's already linked.\n\n` +
-            `Please sign up at invoiceease.in first, then send:\n` +
+            `Please sign up at www.invoiceease.org.in first, then send:\n` +
             `/start +919876543210`,
         };
       }
@@ -411,7 +415,7 @@ const processMessage = async (chatId, userMessage, baseUrlOverride) => {
           `👋 Welcome to *InvoiceEase*!\n\n` +
           `To link your Telegram account, send:\n` +
           `/start +919876543210\n\n` +
-          `(Use the phone number you signed up with at invoiceease.in)`,
+          `(Use the phone number you signed up with at www.invoiceease.org.in)`,
       };
     }
   }
@@ -500,14 +504,38 @@ const processMessage = async (chatId, userMessage, baseUrlOverride) => {
       if (isNaN(price) || price < 0) {
         return { reply: `❌ Invalid price. Please enter a valid number.` };
       }
-      await updateConversationData(chatId, { item_price: price });
-      await updateConversationState(chatId, conversationStates.WAITING_GST_RATE);
+      const currentItems = conversation.data.items || [];
+      currentItems.push({
+        description: conversation.data.item_desc,
+        quantity: conversation.data.item_qty,
+        unitPrice: price
+      });
+      await updateConversationData(chatId, { items: currentItems, item_price: price });
+      await updateConversationState(chatId, conversationStates.WAITING_ADD_ANOTHER_ITEM);
       return {
         reply:
-          `✅ Unit Price: ${formatINR(price)}\n\n` +
-          `📝 *Question 5/7:* What's the GST Rate?\n` +
-          `(Reply with: 0, 5, 12, 18, or 28)`,
+          `✅ Item added: ${conversation.data.item_desc} - ${formatINR(price)}\n\n` +
+          `📝 Do you want to add another item? (Reply Yes or No)`,
       };
+
+    case conversationStates.WAITING_ADD_ANOTHER_ITEM:
+      const answer = lowerMessage;
+      if (answer === 'yes' || answer === 'y') {
+        await updateConversationState(chatId, conversationStates.WAITING_ITEM_DESC);
+        return {
+          reply: `📝 What's the description for the next item?`,
+        };
+      } else if (answer === 'no' || answer === 'n') {
+        await updateConversationState(chatId, conversationStates.WAITING_GST_RATE);
+        return {
+          reply:
+            `✅ Items saved!\n\n` +
+            `📝 What's the GST Rate for the invoice?\n` +
+            `(Reply with: 0, 5, 12, 18, or 28)`,
+        };
+      } else {
+        return { reply: `❌ Please reply with Yes or No.` };
+      }
 
     case conversationStates.WAITING_GST_RATE:
       const rate = Number(userMessage.replace(/[^0-9.]/g, ''));

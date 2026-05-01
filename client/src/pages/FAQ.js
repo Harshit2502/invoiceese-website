@@ -115,7 +115,7 @@ export default function FAQ() {
           <div className="faq-contact">
             <h3>Still have questions?</h3>
             <p>Our support team is here to help!</p>
-            <a href="mailto:support@invoiceease.in" className="btn btn-accent">Contact Support</a>
+            <a href="mailto:support@invoiceease.org.in" className="btn btn-accent">Contact Support</a>
           </div>
         </div>
       </section>

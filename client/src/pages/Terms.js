@@ -57,7 +57,7 @@ export default function Terms() {
           <p>These Terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of courts in Mumbai, Maharashtra.</p>
 
           <h2>11. Contact Information</h2>
-          <p><strong>Email:</strong> legal@invoiceease.in<br /><strong>Address:</strong> InvoiceEase, Mumbai, Maharashtra, India</p>
+          <p><strong>Email:</strong> legal@invoiceease.org.in<br /><strong>Address:</strong> InvoiceEase, Mumbai, Maharashtra, India</p>
 
           <div className="legal-highlight">
             <strong>Note:</strong> By using InvoiceEase, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.

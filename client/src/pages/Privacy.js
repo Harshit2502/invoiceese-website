@@ -45,7 +45,7 @@ export default function Privacy() {
 
           <h2>6. Your Rights</h2>
           <p>You have the right to access all personal data we hold about you, correct inaccurate data, download your data in a portable format (CSV/JSON), delete your account and all associated data, opt out of marketing communications, and withdraw consent at any time.</p>
-          <p>To exercise these rights, email us at privacy@invoiceease.in.</p>
+          <p>To exercise these rights, email us at privacy@invoiceease.org.in.</p>
 
           <h2>7. Data Retention</h2>
           <p>We retain your account data while your account is active. On Free plan: invoices stored for 7 days. On paid plans: invoices stored indefinitely. After account deletion, we delete all personal data within 30 days.</p>
@@ -57,7 +57,7 @@ export default function Privacy() {
           <p>We may update this Privacy Policy periodically. We'll notify you of material changes via email or in-app notification. Continued use after changes constitutes acceptance.</p>
 
           <h2>10. Contact Us</h2>
-          <p><strong>Email:</strong> privacy@invoiceease.in<br /><strong>Address:</strong> InvoiceEase, Mumbai, Maharashtra, India</p>
+          <p><strong>Email:</strong> privacy@invoiceease.org.in<br /><strong>Address:</strong> InvoiceEase, Mumbai, Maharashtra, India</p>
         </div>
       </div>
       <Footer />
