@@ -380,7 +380,7 @@ const processMessage = async (chatId, userMessage, baseUrlOverride) => {
           reply:
             `❌ Invalid phone number format.\n\n` +
             `Please send it like this:\n` +
-            `/start +919876543210`,
+            `Example: /start 9876543210`,
         };
       }
 
@@ -405,17 +405,17 @@ const processMessage = async (chatId, userMessage, baseUrlOverride) => {
         return {
           reply:
             `❌ No account found for that phone number, or it's already linked.\n\n` +
-            `Please sign up at invoiceease.org.in first, then send:\n` +
-            `/start +919876543210`,
+            `Make sure you are sending your actual registered phone number.\n` +
+            `Example: /start 9876543210\n\n` +
+            `If you haven't created an account yet, sign up at invoiceease.org.in`,
         };
       }
     } else {
       return {
         reply:
           `👋 Welcome to *InvoiceEase*!\n\n` +
-          `To link your Telegram account, send:\n` +
-          `/start +919876543210\n\n` +
-          `(Use the phone number you signed up with at invoiceease.org.in)`,
+          `To link your Telegram account, send the /start command followed by the phone number you registered with.\n\n` +
+          `Example: /start 9876543210`,
       };
     }
   }

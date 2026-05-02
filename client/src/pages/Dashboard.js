@@ -457,7 +457,7 @@ export default function Dashboard() {
                 <h2>Telegram Integration</h2>
                 <p>Connect your Telegram bot and create invoices via chat.</p>
               </div>
-              <a href={`https://t.me/${TELEGRAM_BOT_USERNAME}`} target="_blank" rel="noreferrer" className="btn btn-telegram btn-sm">
+              <a href={`https://t.me/${TELEGRAM_BOT_USERNAME}?start=${user?.whatsapp ? String(user.whatsapp).replace(/[^0-9]/g, '') : ''}`} target="_blank" rel="noreferrer" className="btn btn-telegram btn-sm">
                 Open Telegram Bot
               </a>
             </div>
