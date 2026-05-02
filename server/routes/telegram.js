@@ -241,7 +241,7 @@ const generateInvoice = async (chatId, conversation, baseUrlOverride) => {
 
   if (user.plan === 'free' && (user.invoicesThisMonth || 0) >= 5) {
     await resetConversation(chatId);
-    return { reply: '❌ Free plan limit reached (5 invoices/month). Please upgrade at www.invoiceease.org.in to create more invoices.' };
+    return { reply: '❌ Free plan limit reached (5 invoices/month). Please upgrade at invoiceease.org.in to create more invoices.' };
   }
 
   const normalizedItems = Array.isArray(data.items) && data.items.length > 0 
@@ -345,7 +345,7 @@ const generateInvoice = async (chatId, conversation, baseUrlOverride) => {
       (gstAmount ? `📊 GST (${parsedGstRate}%): ${formatINR(gstAmount)}\n` : '') +
       `💰 *Total: ${formatINR(totalAmount)}*\n\n` +
       (invoiceData.pdfUrl ? `📄 Download: ${invoiceData.pdfUrl}\n\n` : '') +
-      `💡 View all invoices at: www.invoiceease.org.in/dashboard\n\n` +
+      `💡 View all invoices at: invoiceease.org.in/dashboard\n\n` +
       `Want to create another invoice? Type /newinvoice`,
   };
 
@@ -405,7 +405,7 @@ const processMessage = async (chatId, userMessage, baseUrlOverride) => {
         return {
           reply:
             `❌ No account found for that phone number, or it's already linked.\n\n` +
-            `Please sign up at www.invoiceease.org.in first, then send:\n` +
+            `Please sign up at invoiceease.org.in first, then send:\n` +
             `/start +919876543210`,
         };
       }
@@ -415,7 +415,7 @@ const processMessage = async (chatId, userMessage, baseUrlOverride) => {
           `👋 Welcome to *InvoiceEase*!\n\n` +
           `To link your Telegram account, send:\n` +
           `/start +919876543210\n\n` +
-          `(Use the phone number you signed up with at www.invoiceease.org.in)`,
+          `(Use the phone number you signed up with at invoiceease.org.in)`,
       };
     }
   }

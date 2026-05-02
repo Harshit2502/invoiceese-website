@@ -65,7 +65,7 @@ invoiceease-website/
 4. **Drag and drop all HTML files**
 5. Done! Your site is live at `https://random-name.netlify.app`
 
-**Pro tip:** Buy your domain (www.invoiceease.org.in) and connect it in Netlify settings.
+**Pro tip:** Buy your domain (invoiceease.org.in) and connect it in Netlify settings.
 
 ### Option 2: Vercel (Also Easy)
 
@@ -281,7 +281,7 @@ Before launch, test:
 
 ## 🚦 Launch Checklist
 
-- [ ] Buy domain (www.invoiceease.org.in)
+- [ ] Buy domain (invoiceease.org.in)
 - [ ] Deploy to Netlify/Vercel
 - [ ] Connect custom domain
 - [ ] Add SSL certificate (auto in Netlify)

@@ -4,7 +4,7 @@ const path = require('path');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Domain that you'll verify in Resend (e.g., www.invoiceease.org.in)
+// Domain that you'll verify in Resend (e.g., invoiceease.org.in)
 // For testing without verification, use the onboarding domain from Resend dashboard if needed.
 const FROM_EMAIL = 'InvoiceEase <hello@invoiceease.org.in>';
 

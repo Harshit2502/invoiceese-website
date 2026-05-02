@@ -272,7 +272,7 @@ async function handleWhatsAppWebhook(req, res) {
             await whatsappService.sendMessage(
                 userPhone,
                 "Welcome to InvoiceEase! 👋\n\n" +
-                "Please complete your signup at www.invoiceease.org.in to start generating invoices."
+                "Please complete your signup at invoiceease.org.in to start generating invoices."
             );
             return res.status(200).send('OK');
         }
@@ -285,7 +285,7 @@ async function handleWhatsAppWebhook(req, res) {
                     userPhone,
                     "You've used all 5 free invoices this month! 🎯\n\n" +
                     "Upgrade to Pro for unlimited invoices:\n" +
-                    "www.invoiceease.org.in/upgrade"
+                    "invoiceease.org.in/upgrade"
                 );
                 return res.status(200).send('OK');
             }

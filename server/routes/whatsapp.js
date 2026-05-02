@@ -483,7 +483,7 @@ const generateInvoice = async (whatsappNumber, conversation) => {
       (igst ? `IGST (18%): ${formatINR(igst)}\n` : '') +
       `Total: ${formatINR(total)}\n\n` +
       `📄 Download: ${invoiceData.pdfUrl}\n\n` +
-      `💡 View all invoices at: www.invoiceease.org.in/dashboard\n\n` +
+      `💡 View all invoices at: invoiceease.org.in/dashboard\n\n` +
       `Want to create another invoice? Type 'new invoice'`,
     document: {
       url: invoiceData.pdfUrl,
