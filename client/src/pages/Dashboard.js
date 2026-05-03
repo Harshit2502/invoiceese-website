@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import './Dashboard.css';
@@ -52,6 +52,7 @@ function countInvoicesThisMonth(invoices) {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { user, authFetch, setUser } = useAuth();
   const [invoices, setInvoices] = useState([]);
   const [stats, setStats] = useState({});
@@ -82,6 +83,9 @@ export default function Dashboard() {
     showWatermark: user?.showWatermark !== false,
     logoUrl: user?.logoUrl || '',
   });
+
+  const isPro = user?.plan === 'pro' || user?.plan === 'business';
+  const isFree = user?.plan === 'free';
 
   const loadInvoices = useCallback(async () => {
     try {
@@ -124,21 +128,6 @@ export default function Dashboard() {
       logoUrl: user?.logoUrl || '',
     });
   }, [user]);
-
-  useEffect(() => {
-    if (window.Razorpay) return;
-
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      if (script.parentNode) {
-        script.parentNode.removeChild(script);
-      }
-    };
-  }, []);
 
   const handleCreateChange = e => setCreateForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
@@ -213,7 +202,11 @@ export default function Dashboard() {
         templateStyle: isPro ? (user?.templateStyle || 'modern') : 'modern',
       });
     } catch (err) {
-      setCreateError(err.message);
+      if (err.message && err.message.includes('limit reached')) {
+        navigate('/pricing');
+      } else {
+        setCreateError(err.message);
+      }
     } finally {
       setCreating(false);
     }
@@ -336,82 +329,6 @@ export default function Dashboard() {
       setTelegramTestSending(false);
     }
   };
-
-  const handlePayInvoice = async (invoice) => {
-    if (!window.Razorpay) {
-      window.alert('Razorpay SDK is not loaded yet. Please refresh and try again.');
-      return;
-    }
-
-    setPayingInvoiceId(invoice.id);
-    try {
-      const orderRes = await authFetch('/api/payments/razorpay/order', {
-        method: 'POST',
-        body: JSON.stringify({ invoiceId: invoice.id }),
-      });
-      const orderData = await orderRes.json();
-      if (!orderRes.ok) throw new Error(orderData.error || 'Failed to create payment order');
-
-      const options = {
-        key: orderData.key,
-        amount: orderData.order.amount,
-        currency: orderData.order.currency,
-        name: user?.businessName || 'InvoiceEase',
-        description: `Payment for ${invoice.invoiceNumber}`,
-        order_id: orderData.order.id,
-        prefill: {
-          name: user?.businessName || '',
-          email: user?.email || '',
-        },
-        notes: {
-          invoiceNumber: invoice.invoiceNumber,
-          invoiceId: invoice.id,
-        },
-        theme: {
-          color: '#0f6e56',
-        },
-        handler: async function (response) {
-          const verifyRes = await authFetch('/api/payments/razorpay/verify', {
-            method: 'POST',
-            body: JSON.stringify({
-              invoiceId: invoice.id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            }),
-          });
-
-          const verifyData = await verifyRes.json();
-          if (!verifyRes.ok) {
-            throw new Error(verifyData.error || 'Payment verification failed');
-          }
-
-          setInvoices((prev) => {
-            const nextInvoices = prev.map((inv) => (inv.id === invoice.id ? verifyData.invoice : inv));
-            setStats(deriveStatsFromInvoices(nextInvoices));
-            return nextInvoices;
-          });
-
-          window.alert('Payment successful and invoice marked as paid.');
-        },
-      };
-
-      const razorpay = new window.Razorpay(options);
-      razorpay.on('payment.failed', function (response) {
-        const reason = response?.error?.description || 'Payment failed';
-        window.alert(reason);
-      });
-      razorpay.open();
-    } catch (error) {
-      window.alert(error.message || 'Could not start payment.');
-    } finally {
-      setPayingInvoiceId(null);
-    }
-  };
-
-  const statusColors = { paid: 'badge-paid', unpaid: 'badge-unpaid', overdue: 'badge-overdue' };
-  const isFree = user?.plan === 'free';
-  const isPro = user?.plan === 'pro' || user?.plan === 'business';
 
   return (
     <div className="dashboard-page">
@@ -716,20 +633,7 @@ export default function Dashboard() {
                           </select>
                         </td>
                         <td className="inv-actions">
-                          {inv.pdfUrl ? (
-                            <a className="btn btn-sm action-btn" href={inv.pdfUrl} target="_blank" rel="noreferrer">PDF</a>
-                          ) : (
-                            <span className="text-muted">No PDF</span>
-                          )}
-                          {inv.status !== 'paid' && (
-                            <button
-                              className="btn btn-sm btn-primary"
-                              onClick={() => handlePayInvoice(inv)}
-                              disabled={payingInvoiceId === inv.id}
-                            >
-                              {payingInvoiceId === inv.id ? 'Processing...' : 'Pay Now'}
-                            </button>
-                          )}
+                          <a href={`/api/invoices/pdf/${inv.id}`} target="_blank" rel="noreferrer" className="btn btn-sm action-btn">PDF</a>
                           <button className="btn btn-sm action-btn" onClick={() => deleteInvoice(inv.id)}>Delete</button>
                         </td>
                       </tr>

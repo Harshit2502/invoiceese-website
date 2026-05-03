@@ -10,103 +10,61 @@ router.use(authMiddleware);
 const getRazorpayClient = () => {
   const keyId = process.env.RAZORPAY_KEY_ID;
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
-
-  if (!keyId || !keySecret) {
-    return null;
-  }
-
-  return new Razorpay({
-    key_id: keyId,
-    key_secret: keySecret,
-  });
+  if (!keyId || !keySecret) return null;
+  return new Razorpay({ key_id: keyId, key_secret: keySecret });
 };
 
-router.post('/razorpay/order', async (req, res) => {
+router.post('/razorpay/subscription-order', async (req, res) => {
   try {
     const razorpay = getRazorpayClient();
-    if (!razorpay) {
-      return res.status(500).json({ error: 'Razorpay is not configured on server' });
+    if (!razorpay) return res.status(500).json({ error: 'Razorpay is not configured on server' });
+
+    const { planName, isYearly } = req.body;
+    let planId;
+    if (planName === 'pro') {
+      planId = isYearly ? process.env.RAZORPAY_PRO_YEARLY_PLAN_ID : process.env.RAZORPAY_PRO_MONTHLY_PLAN_ID;
+    } else if (planName === 'business') {
+      planId = isYearly ? process.env.RAZORPAY_BUSINESS_YEARLY_PLAN_ID : process.env.RAZORPAY_BUSINESS_MONTHLY_PLAN_ID;
     }
 
-    const { invoiceId } = req.body;
-    if (!invoiceId) {
-      return res.status(400).json({ error: 'invoiceId is required' });
+    if (!planId) {
+      return res.status(500).json({ error: `Please configure RAZORPAY_${planName.toUpperCase()}_${isYearly ? 'YEARLY' : 'MONTHLY'}_PLAN_ID in your .env file.` });
     }
 
-    let invoice = null;
-    if (process.env.USE_POSTGRES === 'true') {
-      const pgFunctions = require('../db-postgres');
-      invoice = await pgFunctions.getInvoiceById(invoiceId);
-      if (invoice && invoice.userId !== req.userId) invoice = null;
-    } else {
-      invoice = db.invoices.find((inv) => inv.id === invoiceId && inv.userId === req.userId);
-    }
-    if (!invoice) {
-      return res.status(404).json({ error: 'Invoice not found' });
-    }
-
-    if (invoice.status === 'paid') {
-      return res.status(400).json({ error: 'Invoice is already paid' });
-    }
-
-    const amountInPaise = Math.round(Number(invoice.totalAmount || invoice.amount || 0) * 100);
-    if (!Number.isFinite(amountInPaise) || amountInPaise <= 0) {
-      return res.status(400).json({ error: 'Invoice amount is invalid' });
-    }
-
-    const order = await razorpay.orders.create({
-      amount: amountInPaise,
-      currency: 'INR',
-      receipt: invoice.invoiceNumber,
+    const subscription = await razorpay.subscriptions.create({
+      plan_id: planId,
+      customer_notify: 1,
+      total_count: 120, // Run for 10 years
       notes: {
-        invoiceId: invoice.id,
-        invoiceNumber: invoice.invoiceNumber,
         userId: req.userId,
-      },
+        planName,
+        isYearly: isYearly ? 'true' : 'false'
+      }
     });
 
     res.json({
       key: process.env.RAZORPAY_KEY_ID,
-      order,
-      invoice: {
-        id: invoice.id,
-        invoiceNumber: invoice.invoiceNumber,
-        amount: Number(invoice.totalAmount || invoice.amount || 0),
-        clientName: invoice.clientName,
-      },
+      subscription_id: subscription.id,
+      planName,
     });
   } catch (error) {
-    console.error('Razorpay order create failed:', error);
-    res.status(500).json({ error: 'Failed to create Razorpay order' });
+    console.error('Razorpay subscription create failed:', error);
+    res.status(500).json({ error: error.message || 'Failed to create subscription' });
   }
 });
 
-router.post('/razorpay/verify', async (req, res) => {
+router.post('/razorpay/subscription-verify', async (req, res) => {
   try {
-    const { invoiceId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    const { razorpay_payment_id, razorpay_subscription_id, razorpay_signature, planName } = req.body;
 
-    if (!invoiceId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    if (!razorpay_payment_id || !razorpay_subscription_id || !razorpay_signature || !planName) {
       return res.status(400).json({ error: 'Missing payment verification fields' });
     }
 
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
-    if (!keySecret) {
-      return res.status(500).json({ error: 'Razorpay is not configured on server' });
-    }
+    if (!keySecret) return res.status(500).json({ error: 'Razorpay is not configured' });
 
-    let invoice = null;
-    if (process.env.USE_POSTGRES === 'true') {
-      const pgFunctions = require('../db-postgres');
-      invoice = await pgFunctions.getInvoiceById(invoiceId);
-      if (invoice && invoice.userId !== req.userId) invoice = null;
-    } else {
-      invoice = db.invoices.find((inv) => inv.id === invoiceId && inv.userId === req.userId);
-    }
-    if (!invoice) {
-      return res.status(404).json({ error: 'Invoice not found' });
-    }
-
-    const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const body = `${razorpay_payment_id}|${razorpay_subscription_id}`;
     const expectedSignature = crypto
       .createHmac('sha256', keySecret)
       .update(body)
@@ -116,27 +74,21 @@ router.post('/razorpay/verify', async (req, res) => {
       return res.status(400).json({ error: 'Payment signature verification failed' });
     }
 
-    invoice.status = 'paid';
-    invoice.payment = {
-      gateway: 'razorpay',
-      orderId: razorpay_order_id,
-      paymentId: razorpay_payment_id,
-      signature: razorpay_signature,
-      paidAt: new Date().toISOString(),
-    };
-
+    let user = null;
     if (process.env.USE_POSTGRES === 'true') {
       const pgFunctions = require('../db-postgres');
-      await pgFunctions.updateInvoiceStatus(invoice.id, 'paid', invoice.payment);
+      user = await pgFunctions.updateUser(req.userId, { plan: planName });
+    } else {
+      user = db.users.find(u => u.id === req.userId);
+      if (user) user.plan = planName;
     }
 
-    res.json({
-      message: 'Payment verified successfully',
-      invoice,
-    });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    res.json({ message: 'Subscription successful', plan: planName });
   } catch (error) {
     console.error('Razorpay verify failed:', error);
-    res.status(500).json({ error: 'Failed to verify payment' });
+    res.status(500).json({ error: 'Failed to verify subscription' });
   }
 });
 

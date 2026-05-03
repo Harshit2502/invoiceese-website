@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import './Pricing.css';
@@ -64,6 +65,77 @@ function CellVal({ val }) {
 export default function Pricing() {
   const [yearly, setYearly] = useState(false);
   const [openFaq, setOpenFaq] = useState(null);
+  const { user, authFetch, setUser } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (window.Razorpay) return;
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
+  }, []);
+
+  const handleSubscribe = async (planName, isYearly) => {
+    if (!window.Razorpay) {
+      window.alert('Razorpay SDK is not loaded yet. Please refresh and try again.');
+      return;
+    }
+
+    try {
+      const orderRes = await authFetch('/api/payments/razorpay/subscription-order', {
+        method: 'POST',
+        body: JSON.stringify({ planName: planName.toLowerCase(), isYearly }),
+      });
+      const orderData = await orderRes.json();
+      if (!orderRes.ok) throw new Error(orderData.error || 'Failed to create subscription order');
+
+      const options = {
+        key: orderData.key,
+        subscription_id: orderData.subscription_id,
+        name: 'InvoiceEase',
+        description: `${planName} Plan Subscription`,
+        prefill: {
+          name: user?.businessName || '',
+          email: user?.email || '',
+          contact: user?.whatsapp || '',
+        },
+        theme: { color: '#0f6e56' },
+        handler: async function (response) {
+          try {
+            const verifyRes = await authFetch('/api/payments/razorpay/subscription-verify', {
+              method: 'POST',
+              body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_subscription_id: response.razorpay_subscription_id,
+                razorpay_signature: response.razorpay_signature,
+                planName: orderData.planName,
+              }),
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok) throw new Error(verifyData.error || 'Subscription verification failed');
+
+            setUser(prev => ({ ...prev, plan: verifyData.plan }));
+            window.alert('Subscription successful! Welcome to the new plan.');
+            navigate('/dashboard');
+          } catch (e) {
+            window.alert(e.message);
+          }
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.on('payment.failed', function (response) {
+        window.alert(`Payment failed: ${response?.error?.description || 'Unknown error'}`);
+      });
+      razorpay.open();
+    } catch (error) {
+      window.alert(error.message || 'Could not start subscription process.');
+    }
+  };
 
   return (
     <div>
@@ -100,9 +172,15 @@ export default function Pricing() {
                 {yearly && plan.yearly > 0 && (
                   <p className="billed-yearly">Billed yearly (₹{plan.yearly * 12})</p>
                 )}
-                <Link to={plan.href} className={`btn ${plan.ctaClass} btn-block`} style={{ marginTop: 24, marginBottom: 8 }}>
-                  {plan.cta}
-                </Link>
+                {user && plan.name.toLowerCase() !== 'free' ? (
+                  <button onClick={() => handleSubscribe(plan.name, yearly)} className={`btn ${plan.ctaClass} btn-block`} style={{ marginTop: 24, marginBottom: 8 }}>
+                    {plan.cta}
+                  </button>
+                ) : (
+                  <Link to={plan.href} className={`btn ${plan.ctaClass} btn-block`} style={{ marginTop: 24, marginBottom: 8 }}>
+                    {plan.cta}
+                  </Link>
+                )}
                 <ul className="plan-features">
                   {plan.features.map(f => <li key={f}><span className="check">✓</span>{f}</li>)}
                   {plan.notIncluded.map(f => <li key={f} className="not-included"><span className="cross">—</span>{f}</li>)}
