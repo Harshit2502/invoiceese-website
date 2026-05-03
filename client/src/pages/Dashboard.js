@@ -625,7 +625,8 @@ export default function Dashboard() {
                             className={`status-select status-${inv.status}`}
                             value={inv.status}
                             onChange={e => updateStatus(inv.id, e.target.value)}
-                            disabled={statusUpdating === inv.id}
+                            disabled={isFree || statusUpdating === inv.id}
+                            title={isFree ? "Upgrade to Pro to track payments" : ""}
                           >
                             <option value="unpaid">Unpaid</option>
                             <option value="paid">Paid</option>

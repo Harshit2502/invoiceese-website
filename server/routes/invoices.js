@@ -46,14 +46,22 @@ router.use(authMiddleware);
 // GET /api/invoices - list user's invoices
 router.get('/', async (req, res) => {
   let userInvoices = [];
+  let user = null;
   if (process.env.USE_POSTGRES === 'true') {
     const pgFunctions = require('../db-postgres');
     userInvoices = await pgFunctions.getUserInvoices(req.userId);
+    user = await pgFunctions.getUserById(req.userId);
   } else {
     userInvoices = db.invoices.filter(inv => inv.userId === req.userId);
+    user = db.users.find(u => u.id === req.userId);
   }
 
+  const isFree = user?.plan === 'free';
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
   const invoices = userInvoices
+    .filter(inv => !isFree || new Date(inv.date || inv.createdAt) >= sevenDaysAgo)
     .sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt))
     .map((inv) => {
       const safeAmount = Number(inv.amount) || 0;
