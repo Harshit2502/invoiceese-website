@@ -61,6 +61,9 @@ const numberToWords = (num) => {
 const generateClassicPDF = (doc, invoice, user) => {
   const primaryColor = '#000000';
   const tableHeaderColor = '#b2ebf2';
+  const hasGst = Boolean(user.gstNumber);
+  const badgeText = hasGst ? 'TAX INVOICE' : 'INVOICE';
+  const badgeColor = hasGst ? '#059669' : '#d97706';
 
   doc.fillColor(primaryColor).fontSize(20).font('Helvetica-Bold').text(user.businessName || 'My Business', 50, 50);
   doc.fontSize(10).font('Helvetica').text(`GST: ${user.gstNumber || 'N/A'}`, 50, 75);
@@ -68,6 +71,8 @@ const generateClassicPDF = (doc, invoice, user) => {
   doc.fontSize(10).font('Helvetica')
      .text(`Original • #Sale Bill no. ${invoice.invoiceNumber}`, 350, 50, { align: 'right' })
      .text(`Date: ${new Date(invoice.date || new Date()).toLocaleDateString('en-IN')}`, 350, 70, { align: 'right' });
+
+  doc.fillColor(badgeColor).fontSize(14).font('Helvetica-Bold').text(badgeText, 350, 30, { align: 'right' });
 
   const billToY = 110;
   doc.rect(50, billToY, 495, 60).stroke();
@@ -79,16 +84,22 @@ const generateClassicPDF = (doc, invoice, user) => {
   doc.rect(50, tableTop, 495, 20).fillAndStroke(tableHeaderColor, primaryColor);
   doc.fillColor(primaryColor).fontSize(9).font('Helvetica-Bold');
   
-  const colPositions = { sno: 55, items: 90, qty: 350, rate: 410, amount: 480 };
+  const colPositions = hasGst 
+    ? { sno: 55, items: 90, hsn: 280, qty: 350, rate: 410, amount: 480 }
+    : { sno: 55, items: 90, qty: 350, rate: 410, amount: 480 };
   
   doc.text('S.No.', colPositions.sno, tableTop + 6)
-     .text('ITEMS', colPositions.items, tableTop + 6)
-     .text('QTY', colPositions.qty, tableTop + 6, { width: 50, align: 'right' })
+     .text('ITEMS', colPositions.items, tableTop + 6);
+  
+  if (hasGst) doc.text('HSN/SAC', colPositions.hsn, tableTop + 6);
+
+  doc.text('QTY', colPositions.qty, tableTop + 6, { width: 50, align: 'right' })
      .text('RATE', colPositions.rate, tableTop + 6, { width: 50, align: 'right' })
      .text('AMOUNT', colPositions.amount, tableTop + 6, { width: 60, align: 'right' });
 
   const drawTableLines = (yStart, yEnd) => {
-    [50, 85, 345, 405, 475, 545].forEach(x => { doc.moveTo(x, yStart).lineTo(x, yEnd).stroke(); });
+    const lines = hasGst ? [50, 85, 275, 345, 405, 475, 545] : [50, 85, 345, 405, 475, 545];
+    lines.forEach(x => { doc.moveTo(x, yStart).lineTo(x, yEnd).stroke(); });
   };
 
   let itemsY = tableTop + 20;
@@ -98,8 +109,11 @@ const generateClassicPDF = (doc, invoice, user) => {
 
   invoiceItems.forEach((item, i) => {
     doc.text(String(i + 1), colPositions.sno, itemsY + 5)
-       .text(item.description || 'Item', colPositions.items, itemsY + 5, { width: 250 })
-       .text(String(item.quantity || 1), colPositions.qty, itemsY + 5, { width: 50, align: 'right' })
+       .text(item.description || 'Item', colPositions.items, itemsY + 5, { width: hasGst ? 180 : 250 });
+    
+    if (hasGst) doc.text(item.hsn || '', colPositions.hsn, itemsY + 5);
+
+    doc.text(String(item.quantity || 1), colPositions.qty, itemsY + 5, { width: 50, align: 'right' })
        .text(Number(item.unitPrice || 0).toFixed(2), colPositions.rate, itemsY + 5, { width: 50, align: 'right' })
        .text(Number(item.amount || (item.quantity || 1) * (item.unitPrice || 0)).toFixed(2), colPositions.amount, itemsY + 5, { width: 60, align: 'right' });
     itemsY += 20;
@@ -113,9 +127,16 @@ const generateClassicPDF = (doc, invoice, user) => {
   doc.font('Helvetica-Bold').text('Subtotal', colPositions.items, itemsY + 6).text(Number(invoice.amount || invoice.subtotal || 0).toFixed(2), colPositions.amount, itemsY + 6, { width: 60, align: 'right' });
   itemsY += 20;
 
-  if (invoice.gstAmount > 0) {
+  if (invoice.gstAmount > 0 && hasGst) {
+    const halfGst = (Number(invoice.gstAmount) / 2).toFixed(2);
+    const halfRate = (Number(invoice.gstRate) / 2).toFixed(1);
+    
     doc.rect(50, itemsY, 495, 20).stroke(); drawTableLines(itemsY, itemsY + 20);
-    doc.font('Helvetica-Bold').text(`GST (${invoice.gstRate || 0}%)`, colPositions.items, itemsY + 6).text(Number(invoice.gstAmount || 0).toFixed(2), colPositions.amount, itemsY + 6, { width: 60, align: 'right' });
+    doc.font('Helvetica-Bold').text(`CGST (${halfRate}%)`, colPositions.items, itemsY + 6).text(halfGst, colPositions.amount, itemsY + 6, { width: 60, align: 'right' });
+    itemsY += 20;
+
+    doc.rect(50, itemsY, 495, 20).stroke(); drawTableLines(itemsY, itemsY + 20);
+    doc.font('Helvetica-Bold').text(`SGST (${halfRate}%)`, colPositions.items, itemsY + 6).text(halfGst, colPositions.amount, itemsY + 6, { width: 60, align: 'right' });
     itemsY += 20;
   }
 
@@ -155,6 +176,9 @@ const generatePremiumPDF = (doc, invoice, user) => {
   const mutedColor = '#6b7280';
   const tableBorder = '#e5e7eb';
   const bgGray = '#f8fafc';
+  const hasGst = Boolean(user.gstNumber);
+  const badgeText = hasGst ? 'TAX INVOICE' : 'INVOICE';
+  const badgeColor = hasGst ? '#059669' : '#d97706';
 
   const formatAmountNoSymbol = (val) => Number(val).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 
@@ -166,7 +190,8 @@ const generatePremiumPDF = (doc, invoice, user) => {
   doc.fillColor(textColor).fontSize(20).font('Helvetica-Bold').text(user.businessName || 'My Business', 85, 52);
   doc.fillColor(mutedColor).fontSize(10).font('Helvetica-Oblique').text(`Phone: ${user.whatsapp || 'N/A'}`, 85, 75);
 
-  doc.fillColor(textColor).fontSize(16).font('Helvetica-Bold').text(`Invoice No. ${invoice.invoiceNumber || '1'}`, 300, 52, { width: 245, align: 'right' });
+  doc.fillColor(badgeColor).fontSize(12).font('Helvetica-Bold').text(badgeText, 300, 35, { width: 245, align: 'right' });
+  doc.fillColor(textColor).fontSize(16).font('Helvetica-Bold').text(`No. ${invoice.invoiceNumber || '1'}`, 300, 52, { width: 245, align: 'right' });
   doc.fillColor(textColor).fontSize(10).font('Helvetica-Bold').text(`Invoice Date: ${new Date(invoice.date || new Date()).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`, 300, 75, { width: 245, align: 'right' });
 
   // 2. Bill To Box
@@ -175,8 +200,9 @@ const generatePremiumPDF = (doc, invoice, user) => {
   
   doc.fillColor(mutedColor).fontSize(11).font('Helvetica').text('Bill and Ship To', 65, billToY + 15);
   doc.fillColor(textColor).fontSize(13).font('Helvetica-Bold').text(invoice.clientName || 'Client Name', 65, billToY + 35);
-  doc.fillColor(textColor).fontSize(10).font('Helvetica-Bold').text(`Phone: ${invoice.clientGst || 'N/A'}`, 65, billToY + 55);
-  doc.fillColor(mutedColor).fontSize(10).font('Helvetica-Oblique').text(`GSTIN: ${invoice.clientGst || ''}`, 65, billToY + 70);
+  if (hasGst) {
+    doc.fillColor(textColor).fontSize(10).font('Helvetica-Bold').text(`GSTIN: ${invoice.clientGst || 'N/A'}`, 65, billToY + 55);
+  }
 
   const finalTotal = Number(invoice.totalAmount || invoice.total || invoice.amount || 0);
   doc.fillColor(textColor).fontSize(10).font('Helvetica').text('Total amount', 350, billToY + 15, { width: 175, align: 'right' });
@@ -196,12 +222,17 @@ const generatePremiumPDF = (doc, invoice, user) => {
 
   // 3. Items Table
   let tableTop = 225;
-  const colPositions = { sno: 65, items: 110, priceUnit: 260, qty: 350, rate: 410, total: 470 };
+  const colPositions = hasGst 
+    ? { sno: 65, items: 100, hsn: 210, priceUnit: 270, qty: 350, rate: 410, total: 470 }
+    : { sno: 65, items: 110, priceUnit: 260, qty: 350, rate: 410, total: 470 };
 
   doc.fillColor(textColor).fontSize(10).font('Helvetica-Bold');
   doc.text('#', colPositions.sno, tableTop + 15)
-     .text('Item Details', colPositions.items, tableTop + 15)
-     .text('Price/Unit', colPositions.priceUnit, tableTop + 15, { width: 70, align: 'center' })
+     .text('Item Details', colPositions.items, tableTop + 15);
+     
+  if (hasGst) doc.text('HSN/SAC', colPositions.hsn, tableTop + 15);
+
+  doc.text('Price/Unit', colPositions.priceUnit, tableTop + 15, { width: 70, align: 'center' })
      .text('Qty', colPositions.qty, tableTop + 15, { width: 40, align: 'center' })
      .text('Rate', colPositions.rate, tableTop + 15, { width: 60, align: 'center' })
      .text('Total', colPositions.total, tableTop + 15, { width: 60, align: 'right' });
@@ -219,8 +250,11 @@ const generatePremiumPDF = (doc, invoice, user) => {
     const amt = Number(item.amount || (qty * unitPrice));
     
     doc.text(String(i + 1).padStart(2, '0'), colPositions.sno, itemsY)
-       .text(item.description || 'Item', colPositions.items, itemsY, { width: 140 })
-       .text(`${unitPrice.toFixed(0)}/PCS`, colPositions.priceUnit, itemsY, { width: 70, align: 'center' })
+       .text(item.description || 'Item', colPositions.items, itemsY, { width: hasGst ? 100 : 140 });
+       
+    if (hasGst) doc.text(item.hsn || '', colPositions.hsn, itemsY);
+
+    doc.text(`${unitPrice.toFixed(0)}/PCS`, colPositions.priceUnit, itemsY, { width: 70, align: 'center' })
        .text(String(qty), colPositions.qty, itemsY, { width: 40, align: 'center' })
        .text(unitPrice.toFixed(0), colPositions.rate, itemsY, { width: 60, align: 'center' })
        .font('Helvetica-Bold')
@@ -241,13 +275,23 @@ const generatePremiumPDF = (doc, invoice, user) => {
 
   itemsY = subY + 30;
 
-  if (invoice.gstAmount > 0) {
-    const gstY = itemsY;
-    doc.rect(51, gstY, 493, 25).fill('#ffffff');
+  if (invoice.gstAmount > 0 && hasGst) {
+    const halfGst = (Number(invoice.gstAmount) / 2).toFixed(0);
+    const halfRate = (Number(invoice.gstRate) / 2).toFixed(1);
+
+    let gstY = itemsY;
+    doc.rect(51, gstY, 493, 20).fill('#ffffff');
     doc.fillColor(textColor).font('Helvetica-Bold').fontSize(9)
-       .text(`GST (${invoice.gstRate || 0}%)`, colPositions.sno, gstY + 8)
-       .text(Number(invoice.gstAmount || 0).toFixed(0), colPositions.total, gstY + 8, { width: 60, align: 'right' });
-    itemsY += 25;
+       .text(`CGST (${halfRate}%)`, colPositions.sno, gstY + 5)
+       .text(halfGst, colPositions.total, gstY + 5, { width: 60, align: 'right' });
+    gstY += 20;
+
+    doc.rect(51, gstY, 493, 20).fill('#ffffff');
+    doc.fillColor(textColor).font('Helvetica-Bold').fontSize(9)
+       .text(`SGST (${halfRate}%)`, colPositions.sno, gstY + 5)
+       .text(halfGst, colPositions.total, gstY + 5, { width: 60, align: 'right' });
+       
+    itemsY = gstY + 25;
   }
 
   doc.roundedRect(50, tableTop, 495, itemsY - tableTop, 8).lineWidth(1).stroke(tableBorder);

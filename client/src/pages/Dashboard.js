@@ -79,13 +79,15 @@ export default function Dashboard() {
   const [telegramTestMessage, setTelegramTestMessage] = useState('');
   const [payingInvoiceId, setPayingInvoiceId] = useState(null);
   const [settingsForm, setSettingsForm] = useState({ 
-    templateStyle: user?.templateStyle || 'modern', 
-    showWatermark: user?.showWatermark !== false,
+    templateStyle: user?.templateStyle || 'modern',
+    showWatermark: user?.showWatermark ?? true,
     logoUrl: user?.logoUrl || '',
+    gstNumber: user?.gstNumber || '',
   });
 
   const isPro = user?.plan === 'pro' || user?.plan === 'business';
   const isFree = user?.plan === 'free';
+  const hasGst = Boolean(user?.gstNumber);
 
   const loadInvoices = useCallback(async () => {
     try {
@@ -126,6 +128,7 @@ export default function Dashboard() {
       templateStyle: user?.templateStyle || 'modern',
       showWatermark: user?.showWatermark !== false,
       logoUrl: user?.logoUrl || '',
+      gstNumber: user?.gstNumber || '',
     });
   }, [user]);
 
@@ -145,7 +148,7 @@ export default function Dashboard() {
   const addItemRow = () => {
     setCreateForm((prev) => ({
       ...prev,
-      items: [...prev.items, { description: '', quantity: 1, unitPrice: '' }],
+      items: [...prev.items, { description: '', hsn: '', quantity: 1, unitPrice: '' }],
     }));
   };
 
@@ -178,12 +181,14 @@ export default function Dashboard() {
       const res = await authFetch('/api/invoices', {
         method: 'POST',
         body: JSON.stringify({
-          ...createForm,
-          items: (createForm.items || []).map((item) => ({
-            description: String(item.description || '').trim(),
-            quantity: Number(item.quantity) || 0,
-            unitPrice: Number(item.unitPrice) || 0,
-          })),
+            ...createForm,
+            gstRate: hasGst ? createForm.gstRate : 0,
+            items: (createForm.items || []).map((item) => ({
+              description: String(item.description || '').trim(),
+              hsn: hasGst ? String(item.hsn || '').trim() : '',
+              quantity: Number(item.quantity) || 0,
+              unitPrice: Number(item.unitPrice) || 0,
+            })),
         }),
       });
       const data = await res.json();
@@ -196,8 +201,9 @@ export default function Dashboard() {
       setShowCreate(false);
       setCreateForm({
         clientName: '',
-        items: [{ description: '', quantity: 1, unitPrice: '' }],
-        gstRate: 18,
+        clientGst: '',
+        items: [{ description: '', hsn: '', quantity: 1, unitPrice: '' }],
+        gstRate: hasGst ? 18 : 0,
         notes: '',
         templateStyle: isPro ? (user?.templateStyle || 'modern') : 'modern',
       });
@@ -288,7 +294,10 @@ export default function Dashboard() {
 
       const profileRes = await authFetch('/api/users/profile', {
         method: 'PATCH',
-        body: JSON.stringify({ logoUrl: nextLogoUrl }),
+        body: JSON.stringify({ 
+          logoUrl: nextLogoUrl,
+          gstNumber: settingsForm.gstNumber 
+        }),
       });
       const profileData = await profileRes.json();
       if (!profileRes.ok) throw new Error(profileData.error);
@@ -437,6 +446,12 @@ export default function Dashboard() {
                     <label className="form-label">Client Name <span className="required">*</span></label>
                     <input className="form-input" name="clientName" value={createForm.clientName} onChange={handleCreateChange} placeholder="Acme Corporation" required />
                   </div>
+                  {hasGst && (
+                    <div className="form-group">
+                      <label className="form-label">Client GSTIN <span className="optional-tag">(Optional)</span></label>
+                      <input className="form-input" name="clientGst" value={createForm.clientGst || ''} onChange={handleCreateChange} placeholder="22AAAAA0000A1Z5" />
+                    </div>
+                  )}
                   <div className="form-group">
                     <label className="form-label">Invoice Items <span className="required">*</span></label>
                     {(createForm.items || []).map((item, index) => (
@@ -448,6 +463,15 @@ export default function Dashboard() {
                           onChange={(e) => handleItemChange(index, 'description', e.target.value)}
                           required
                         />
+                        {hasGst && (
+                          <input
+                            className="form-input"
+                            placeholder="HSN/SAC"
+                            value={item.hsn || ''}
+                            onChange={(e) => handleItemChange(index, 'hsn', e.target.value)}
+                            style={{ maxWidth: '100px' }}
+                          />
+                        )}
                         <input
                           className="form-input"
                           type="number"
@@ -479,23 +503,29 @@ export default function Dashboard() {
                     ))}
                     <button type="button" className="btn btn-secondary btn-sm" onClick={addItemRow}>+ Add Item</button>
                   </div>
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label className="form-label">GST Rate (%)</label>
-                      <select className="form-select" name="gstRate" value={createForm.gstRate} onChange={handleCreateChange}>
-                        <option value={0}>0% (Exempt)</option>
-                        <option value={5}>5%</option>
-                        <option value={12}>12%</option>
-                        <option value={18}>18% (Standard)</option>
-                        <option value={28}>28%</option>
-                      </select>
+                  {hasGst && (
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">GST Rate (%)</label>
+                        <select className="form-select" name="gstRate" value={createForm.gstRate} onChange={handleCreateChange}>
+                          <option value={0}>0% (Exempt)</option>
+                          <option value={5}>5%</option>
+                          <option value={12}>12%</option>
+                          <option value={18}>18% (Standard)</option>
+                          <option value={28}>28%</option>
+                        </select>
+                      </div>
                     </div>
-                  </div>
+                  )}
                   {itemsSubtotal > 0 && (
                     <div className="gst-preview">
-                      Subtotal: ₹{itemsSubtotal.toLocaleString('en-IN')} +
-                      GST ({createForm.gstRate}%): ₹{previewGstAmount.toLocaleString('en-IN')} =&nbsp;
-                      <strong>Total: ₹{previewTotal.toLocaleString('en-IN')}</strong>
+                      Subtotal: ₹{itemsSubtotal.toLocaleString('en-IN')}
+                      {hasGst && (
+                        <>
+                          {' '} + GST ({createForm.gstRate}%): ₹{previewGstAmount.toLocaleString('en-IN')}
+                        </>
+                      )}
+                      &nbsp;=&nbsp;<strong>Total: ₹{previewTotal.toLocaleString('en-IN')}</strong>
                     </div>
                   )}
                   <div className="form-group">
@@ -535,6 +565,17 @@ export default function Dashboard() {
                 {settingsError && <div className="alert alert-error">{settingsError}</div>}
                 {settingsSaved && <div className="alert alert-success">Settings saved successfully!</div>}
                 <form onSubmit={handleSaveSettings}>
+                  <div className="form-group">
+                    <label className="form-label">Your GST Number</label>
+                    <input 
+                      className="form-input" 
+                      value={settingsForm.gstNumber} 
+                      onChange={(e) => setSettingsForm(f => ({ ...f, gstNumber: e.target.value }))} 
+                      placeholder="Leave blank for Non-GST Invoices" 
+                    />
+                    <p className="form-helper">Adding a GST number upgrades your invoices to "Tax Invoices" with CGST/SGST breakdowns.</p>
+                  </div>
+
                   <div className="form-group">
                     <label className="form-label">Default Template</label>
                     <select className="form-select" value={settingsForm.templateStyle} onChange={(e) => setSettingsForm(f => ({ ...f, templateStyle: e.target.value }))}>

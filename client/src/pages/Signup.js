@@ -48,6 +48,7 @@ function SignupField({
 export default function Signup() {
   const { signup } = useAuth();
   const navigate = useNavigate();
+  const [hasGst, setHasGst] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -63,7 +64,9 @@ export default function Signup() {
     if (form.password.length < 8) { setError('Password must be at least 8 characters.'); return; }
     setLoading(true);
     try {
-      await signup(form);
+      const submitData = { ...form };
+      if (!hasGst) submitData.gstNumber = '';
+      await signup(submitData);
       navigate('/dashboard');
     } catch (err) {
       setError(err.message);
@@ -135,13 +138,24 @@ export default function Signup() {
               helper="This will appear on all your invoices"
             />
             <div className="form-row">
-              <SignupField
-                label="GST Number"
-                name="gstNumber"
-                value={form.gstNumber}
-                onChange={handleChange}
-                placeholder="27XXXXX1234X1Z5"
-              />
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={hasGst} onChange={e => setHasGst(e.target.checked)} />
+                  I have a GST Number
+                </label>
+              </div>
+              {hasGst && (
+                <div className="form-group">
+                  <label className="form-label">GST Number</label>
+                  <input
+                    className="form-input"
+                    name="gstNumber"
+                    value={form.gstNumber}
+                    onChange={handleChange}
+                    placeholder="22AAAAA0000A1Z5"
+                  />
+                </div>
+              )}
               <SignupField
                 label="PAN Number"
                 name="panNumber"

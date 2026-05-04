@@ -121,7 +121,7 @@ router.post('/', async (req, res) => {
     return res.status(403).json({ error: 'Free plan limit reached (5 invoices/month). Please upgrade.' });
   }
 
-  const { clientName, service, amount, items, gstRate = 18, notes, dueDate, templateStyle } = req.body;
+  const { clientName, clientGst, service, amount, items, gstRate = 18, notes, dueDate, templateStyle } = req.body;
   if (!clientName) {
     return res.status(400).json({ error: 'Client name is required' });
   }
@@ -133,6 +133,7 @@ router.post('/', async (req, res) => {
         const unitPrice = Number(item.unitPrice);
         return {
           description,
+          hsn: String(item.hsn || '').trim(),
           quantity,
           unitPrice,
           amount: Number((quantity * unitPrice).toFixed(2)),
@@ -156,7 +157,7 @@ router.post('/', async (req, res) => {
   }
 
   const parsedAmount = Number(normalizedItems.reduce((sum, item) => sum + item.amount, 0).toFixed(2));
-  const parsedGstRate = Number(gstRate);
+  const parsedGstRate = user.gstNumber ? Number(gstRate) : 0;
 
   if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
     return res.status(400).json({ error: 'Amount must be a valid positive number' });
@@ -188,6 +189,7 @@ router.post('/', async (req, res) => {
     userId: req.userId,
     invoiceNumber,
     clientName,
+    clientGst: user.gstNumber ? clientGst : '',
     service: normalizedItems[0].description,
     items: normalizedItems,
     amount: parsedAmount,

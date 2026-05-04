@@ -526,13 +526,23 @@ const processMessage = async (chatId, userMessage, baseUrlOverride) => {
           reply: `📝 What's the description for the next item?`,
         };
       } else if (answer === 'no' || answer === 'n') {
-        await updateConversationState(chatId, conversationStates.WAITING_GST_RATE);
-        return {
-          reply:
-            `✅ Items saved!\n\n` +
-            `📝 What's the GST Rate for the invoice?\n` +
-            `(Reply with: 0, 5, 12, 18, or 28)`,
-        };
+        if (user.gstNumber) {
+          await updateConversationState(chatId, conversationStates.WAITING_GST_RATE);
+          return {
+            reply:
+              `✅ Items saved!\n\n` +
+              `📝 What's the GST Rate for the invoice?\n` +
+              `(Reply with: 0, 5, 12, 18, or 28)`,
+          };
+        } else {
+          await updateConversationData(chatId, { gst_rate: 0 });
+          await updateConversationState(chatId, conversationStates.WAITING_NOTES);
+          return {
+            reply:
+              `✅ Items saved!\n\n` +
+              `📝 *Question 6/7:* Any notes/payment terms? (Type 'skip' if none)`,
+          };
+        }
       } else {
         return { reply: `❌ Please reply with Yes or No.` };
       }
