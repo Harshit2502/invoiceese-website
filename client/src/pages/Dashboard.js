@@ -690,7 +690,7 @@ export default function Dashboard() {
                           </select>
                         </td>
                         <td className="inv-actions">
-                          <a href={`/api/invoices/pdf/${inv.id}`} target="_blank" rel="noreferrer" className="btn btn-sm action-btn">PDF</a>
+                          <a href={`/api/pdf/${inv.id}`} target="_blank" rel="noreferrer" className="btn btn-sm action-btn">PDF</a>
                           <button className="btn btn-sm action-btn" onClick={() => deleteInvoice(inv.id)}>Delete</button>
                         </td>
                       </tr>
