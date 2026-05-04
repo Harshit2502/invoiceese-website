@@ -1,0 +1,2 @@
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS client_address TEXT;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS client_mobile VARCHAR(20);

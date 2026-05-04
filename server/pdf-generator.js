@@ -75,12 +75,24 @@ const generateClassicPDF = (doc, invoice, user) => {
   doc.fillColor(badgeColor).fontSize(14).font('Helvetica-Bold').text(badgeText, 350, 30, { align: 'right' });
 
   const billToY = 110;
-  doc.rect(50, billToY, 495, 60).stroke();
+  doc.rect(50, billToY, 495, 90).stroke();
   doc.fillColor('#666666').fontSize(10).font('Helvetica-Bold').text('BILL TO', 60, billToY + 10);
   doc.fillColor(primaryColor).fontSize(12).font('Helvetica-Bold').text(invoice.clientName, 60, billToY + 25);
-  doc.fontSize(10).font('Helvetica').text(`GST: ${invoice.clientGst || 'N/A'}`, 60, billToY + 40);
+  
+  let yPos = billToY + 40;
+  if (invoice.clientAddress) {
+    doc.fontSize(10).font('Helvetica').text(invoice.clientAddress, 60, yPos);
+    yPos += 15;
+  }
+  if (invoice.clientMobile) {
+    doc.fontSize(10).font('Helvetica').text(`Mobile: ${invoice.clientMobile}`, 60, yPos);
+    yPos += 15;
+  }
+  if (hasGst) {
+    doc.fontSize(10).font('Helvetica-Bold').text(`GSTIN: ${invoice.clientGst || 'N/A'}`, 60, yPos);
+  }
 
-  const tableTop = 190;
+  const tableTop = 210;
   doc.rect(50, tableTop, 495, 20).fillAndStroke(tableHeaderColor, primaryColor);
   doc.fillColor(primaryColor).fontSize(9).font('Helvetica-Bold');
   
@@ -196,12 +208,22 @@ const generatePremiumPDF = (doc, invoice, user) => {
 
   // 2. Bill To Box
   const billToY = 110;
-  doc.roundedRect(50, billToY, 495, 95, 8).lineWidth(1).stroke(primaryColor);
+  doc.roundedRect(50, billToY, 495, 110, 8).lineWidth(1).stroke(primaryColor);
   
   doc.fillColor(mutedColor).fontSize(11).font('Helvetica').text('Bill and Ship To', 65, billToY + 15);
   doc.fillColor(textColor).fontSize(13).font('Helvetica-Bold').text(invoice.clientName || 'Client Name', 65, billToY + 35);
+  
+  let pYPos = billToY + 55;
+  if (invoice.clientAddress) {
+    doc.fillColor(textColor).fontSize(10).font('Helvetica').text(invoice.clientAddress, 65, pYPos);
+    pYPos += 15;
+  }
+  if (invoice.clientMobile) {
+    doc.fillColor(textColor).fontSize(10).font('Helvetica').text(`Mobile: ${invoice.clientMobile}`, 65, pYPos);
+    pYPos += 15;
+  }
   if (hasGst) {
-    doc.fillColor(textColor).fontSize(10).font('Helvetica-Bold').text(`GSTIN: ${invoice.clientGst || 'N/A'}`, 65, billToY + 55);
+    doc.fillColor(textColor).fontSize(10).font('Helvetica-Bold').text(`GSTIN: ${invoice.clientGst || 'N/A'}`, 65, pYPos);
   }
 
   const finalTotal = Number(invoice.totalAmount || invoice.total || invoice.amount || 0);
@@ -221,7 +243,7 @@ const generatePremiumPDF = (doc, invoice, user) => {
   }
 
   // 3. Items Table
-  let tableTop = 225;
+  let tableTop = 235;
   const colPositions = hasGst 
     ? { sno: 65, items: 100, hsn: 210, priceUnit: 270, qty: 350, rate: 410, total: 470 }
     : { sno: 65, items: 110, priceUnit: 260, qty: 350, rate: 410, total: 470 };

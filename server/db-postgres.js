@@ -21,7 +21,7 @@ const pool = process.env.DATABASE_URL
 const initializeDatabase = async () => {
   try {
     // Run migrations in order
-    const migrations = ['000_create_users_table.sql', '001_create_conversations_table.sql', '002_add_missing_fields.sql'];
+    const migrations = ['000_create_users_table.sql', '001_create_conversations_table.sql', '002_add_missing_fields.sql', '003_add_client_fields.sql'];
     
     for (const migration of migrations) {
       const migrationPath = path.join(__dirname, 'migrations', migration);
@@ -116,29 +116,29 @@ const updateUser = async (userId, updates) => {
 
 // INVOICE FUNCTIONS
 const createInvoice = async (invoiceData) => {
-  const { id, userId, invoiceNumber, clientName, clientGst, service, items, amount, gstRate, gstAmount, totalAmount, notes, dueDate, pdfUrl, status, date } = invoiceData;
+  const { id, userId, invoiceNumber, clientName, clientGst, clientAddress, clientMobile, service, items, amount, gstRate, gstAmount, totalAmount, notes, dueDate, pdfUrl, status, date } = invoiceData;
   
   const itemsJson = items ? JSON.stringify(items) : '[]';
   
   const result = await pool.query(
-    `INSERT INTO invoices (id, user_id, invoice_number, client_name, client_gst, service_description, items, subtotal, gst_rate, gst_amount, cgst, sgst, igst, total, gst_type, notes, due_date, pdf_url, status, invoice_date, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, 'intrastate', $15, $16, $17, $18, $19, NOW(), NOW())
+    `INSERT INTO invoices (id, user_id, invoice_number, client_name, client_gst, client_address, client_mobile, service_description, items, subtotal, gst_rate, gst_amount, cgst, sgst, igst, total, gst_type, notes, due_date, pdf_url, status, invoice_date, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, 'intrastate', $17, $18, $19, $20, $21, NOW(), NOW())
      RETURNING *`,
-    [id, userId, invoiceNumber, clientName, clientGst, service, itemsJson, amount, gstRate, gstAmount, gstAmount/2, gstAmount/2, 0, totalAmount, notes || '', dueDate || null, pdfUrl || null, status, date]
+    [id, userId, invoiceNumber, clientName, clientGst, clientAddress || null, clientMobile || null, service, itemsJson, amount, gstRate, gstAmount, gstAmount/2, gstAmount/2, 0, totalAmount, notes || '', dueDate || null, pdfUrl || null, status, date]
   );
   return result.rows[0];
 };
 
 const getInvoiceById = async (invoiceId) => {
   return dbQuerySingle(
-    `SELECT id, user_id as "userId", invoice_number as "invoiceNumber", client_name as "clientName", client_gst as "clientGst", service_description as "service", items, subtotal as "amount", gst_rate as "gstRate", gst_amount as "gstAmount", cgst, sgst, igst, total as "totalAmount", gst_type as "gstType", pdf_url as "pdfUrl", notes, due_date as "dueDate", payment_details as "payment", status, invoice_date as "date", created_at as "createdAt" FROM invoices WHERE id = $1`,
+    `SELECT id, user_id as "userId", invoice_number as "invoiceNumber", client_name as "clientName", client_gst as "clientGst", client_address as "clientAddress", client_mobile as "clientMobile", service_description as "service", items, subtotal as "amount", gst_rate as "gstRate", gst_amount as "gstAmount", cgst, sgst, igst, total as "totalAmount", gst_type as "gstType", pdf_url as "pdfUrl", notes, due_date as "dueDate", payment_details as "payment", status, invoice_date as "date", created_at as "createdAt" FROM invoices WHERE id = $1`,
     [invoiceId]
   );
 };
 
 const getUserInvoices = async (userId) => {
   return dbQuery(
-    `SELECT id, user_id as "userId", invoice_number as "invoiceNumber", client_name as "clientName", client_gst as "clientGst", service_description as "service", items, subtotal as "amount", gst_rate as "gstRate", gst_amount as "gstAmount", cgst, sgst, igst, total as "totalAmount", gst_type as "gstType", pdf_url as "pdfUrl", notes, due_date as "dueDate", payment_details as "payment", status, invoice_date as "date", created_at as "createdAt" FROM invoices WHERE user_id = $1 ORDER BY created_at DESC`,
+    `SELECT id, user_id as "userId", invoice_number as "invoiceNumber", client_name as "clientName", client_gst as "clientGst", client_address as "clientAddress", client_mobile as "clientMobile", service_description as "service", items, subtotal as "amount", gst_rate as "gstRate", gst_amount as "gstAmount", cgst, sgst, igst, total as "totalAmount", gst_type as "gstType", pdf_url as "pdfUrl", notes, due_date as "dueDate", payment_details as "payment", status, invoice_date as "date", created_at as "createdAt" FROM invoices WHERE user_id = $1 ORDER BY created_at DESC`,
     [userId]
   );
 };

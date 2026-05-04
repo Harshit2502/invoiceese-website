@@ -61,7 +61,10 @@ export default function Dashboard() {
   const [showSettings, setShowSettings] = useState(false);
   const [createForm, setCreateForm] = useState({
     clientName: '',
-    items: [{ description: '', quantity: 1, unitPrice: '' }],
+    clientGst: '',
+    clientAddress: '',
+    clientMobile: '',
+    items: [{ description: '', hsn: '', quantity: 1, unitPrice: '' }],
     gstRate: 18,
     notes: '',
     templateStyle: 'modern',
@@ -202,6 +205,8 @@ export default function Dashboard() {
       setCreateForm({
         clientName: '',
         clientGst: '',
+        clientAddress: '',
+        clientMobile: '',
         items: [{ description: '', hsn: '', quantity: 1, unitPrice: '' }],
         gstRate: hasGst ? 18 : 0,
         notes: '',
@@ -445,6 +450,16 @@ export default function Dashboard() {
                   <div className="form-group">
                     <label className="form-label">Client Name <span className="required">*</span></label>
                     <input className="form-input" name="clientName" value={createForm.clientName} onChange={handleCreateChange} placeholder="Acme Corporation" required />
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label className="form-label">Client Address <span className="optional-tag">(Optional)</span></label>
+                      <input className="form-input" name="clientAddress" value={createForm.clientAddress || ''} onChange={handleCreateChange} placeholder="123 Street, City" />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Client Mobile <span className="optional-tag">(Optional)</span></label>
+                      <input className="form-input" name="clientMobile" value={createForm.clientMobile || ''} onChange={handleCreateChange} placeholder="9876543210" />
+                    </div>
                   </div>
                   {hasGst && (
                     <div className="form-group">

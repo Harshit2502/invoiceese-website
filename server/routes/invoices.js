@@ -121,7 +121,7 @@ router.post('/', async (req, res) => {
     return res.status(403).json({ error: 'Free plan limit reached (5 invoices/month). Please upgrade.' });
   }
 
-  const { clientName, clientGst, service, amount, items, gstRate = 18, notes, dueDate, templateStyle } = req.body;
+  const { clientName, clientGst, clientAddress, clientMobile, service, amount, items, gstRate = 18, notes, dueDate, templateStyle } = req.body;
   if (!clientName) {
     return res.status(400).json({ error: 'Client name is required' });
   }
@@ -190,6 +190,8 @@ router.post('/', async (req, res) => {
     invoiceNumber,
     clientName,
     clientGst: user.gstNumber ? clientGst : '',
+    clientAddress,
+    clientMobile,
     service: normalizedItems[0].description,
     items: normalizedItems,
     amount: parsedAmount,
