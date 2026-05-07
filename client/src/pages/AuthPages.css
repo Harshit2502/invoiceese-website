@@ -98,6 +98,36 @@
 
 .optional-tag { font-size: 13px; color: var(--text-muted); font-weight: 400; }
 
+/* Password reset sent state */
+.reset-sent-state {
+  text-align: center;
+  padding: 12px 0 8px;
+}
+
+.reset-sent-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.reset-sent-state h3 {
+  font-size: 20px;
+  margin-bottom: 10px;
+  color: var(--primary);
+}
+
+.reset-sent-state p {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.reset-sent-hint {
+  font-size: 13px !important;
+  color: var(--text-muted) !important;
+  opacity: 0.7;
+}
+
 .required { color: var(--danger); }
 
 @media (max-width: 768px) {

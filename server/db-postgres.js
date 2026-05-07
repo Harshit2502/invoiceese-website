@@ -114,6 +114,14 @@ const updateUser = async (userId, updates) => {
   return result.rows[0];
 };
 
+const updateUserPassword = async (userId, newPasswordHash) => {
+  const result = await pool.query(
+    `UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2 RETURNING id`,
+    [newPasswordHash, userId]
+  );
+  return result.rows[0];
+};
+
 // INVOICE FUNCTIONS
 const createInvoice = async (invoiceData) => {
   const { id, userId, invoiceNumber, clientName, clientGst, clientAddress, clientMobile, service, items, amount, gstRate, gstAmount, totalAmount, notes, dueDate, pdfUrl, status, date } = invoiceData;
@@ -230,6 +238,7 @@ module.exports = {
   getUserById,
   getUserByWhatsApp,
   updateUser,
+  updateUserPassword,
   createInvoice,
   getInvoiceById,
   getUserInvoices,
