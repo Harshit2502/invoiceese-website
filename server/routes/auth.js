@@ -55,6 +55,11 @@ router.post('/signup', async (req, res) => {
     const token = jwt.sign({ userId: newUser.id }, JWT_SECRET, { expiresIn: '7d' });
     const { passwordHash: _, ...userSafe } = newUser;
 
+    // Send welcome email in background
+    const { sendWelcomeEmail } = require('../services/email');
+    sendWelcomeEmail(normalizedEmail, businessName)
+      .catch(err => console.error('Welcome email failed:', err));
+
     res.status(201).json({ token, user: userSafe, message: 'Account created successfully' });
   } catch (err) {
     res.status(500).json({ error: 'Server error during signup' });

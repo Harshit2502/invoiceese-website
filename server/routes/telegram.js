@@ -325,13 +325,6 @@ const generateInvoice = async (chatId, conversation, baseUrlOverride) => {
     user.invoicesThisMonth = (user.invoicesThisMonth || 0) + 1;
   }
 
-  // Send email
-  if (invoiceData.pdfUrl && pdfResult && pdfResult.filePath) {
-    const { sendInvoiceEmail } = require('../services/email');
-    sendInvoiceEmail(user.email, data.client_name, invoiceData, pdfResult.filePath)
-      .catch(err => console.error('Background email failed:', err));
-  }
-
   // Reset conversation after invoice creation
   await resetConversation(chatId);
 

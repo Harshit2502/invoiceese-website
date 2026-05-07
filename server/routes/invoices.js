@@ -4,7 +4,6 @@ const publicRouter = express.Router(); // Public routes without auth
 const { v4: uuidv4 } = require('uuid');
 const authMiddleware = require('../middleware/auth');
 const db = require('../db');
-const { sendInvoiceEmail } = require('../services/email');
 
 // Public routes (no auth required)
 publicRouter.get('/pdf/:id', async (req, res) => {
@@ -245,12 +244,6 @@ router.post('/', async (req, res) => {
   } else {
     db.invoices.push(invoice);
     user.invoicesThisMonth = (user.invoicesThisMonth || 0) + 1;
-  }
-
-  // Send email via Resend
-  if (invoice.pdfUrl && pdfResult && pdfResult.filePath) {
-    sendInvoiceEmail(user.email, clientName, invoice, pdfResult.filePath)
-      .catch(err => console.error('Background email failed:', err));
   }
 
   res.status(201).json({ invoice, message: 'Invoice created successfully' });

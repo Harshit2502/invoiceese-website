@@ -75,15 +75,31 @@ router.post('/razorpay/subscription-verify', async (req, res) => {
     }
 
     let user = null;
+    let userEmail = '';
+    let businessName = '';
     if (process.env.USE_POSTGRES === 'true') {
       const pgFunctions = require('../db-postgres');
+      const fullUser = await pgFunctions.getUserById(req.userId);
+      userEmail = fullUser?.email || '';
+      businessName = fullUser?.businessName || '';
       user = await pgFunctions.updateUser(req.userId, { plan: planName });
     } else {
       user = db.users.find(u => u.id === req.userId);
-      if (user) user.plan = planName;
+      if (user) {
+        user.plan = planName;
+        userEmail = user.email;
+        businessName = user.businessName;
+      }
     }
 
     if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Send upgrade email in background
+    if (userEmail) {
+      const { sendPlanUpgradeEmail } = require('../services/email');
+      sendPlanUpgradeEmail(userEmail, businessName, planName)
+        .catch(err => console.error('Upgrade email failed:', err));
+    }
 
     res.json({ message: 'Subscription successful', plan: planName });
   } catch (error) {
