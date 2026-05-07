@@ -34,7 +34,7 @@ router.post('/razorpay/subscription-order', async (req, res) => {
     const subscription = await razorpay.subscriptions.create({
       plan_id: planId,
       customer_notify: 1,
-      total_count: 120, // Run for 10 years
+      total_count: isYearly ? 10 : 120, // yearly: 10 years, monthly: 120 months (10 years)
       notes: {
         userId: req.userId,
         planName,
