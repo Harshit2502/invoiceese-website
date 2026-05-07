@@ -58,6 +58,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [createForm, setCreateForm] = useState({
     clientName: '',
@@ -370,7 +371,13 @@ export default function Dashboard() {
               {isPro && (
                 <button className="btn btn-secondary" onClick={() => setShowSettings(true)}>⚙️ Settings</button>
               )}
-              <button className="btn btn-primary" onClick={() => setShowCreate(true)}>+ New Invoice</button>
+              <button className="btn btn-primary" onClick={() => {
+                if (isFree && countInvoicesThisMonth(invoices) >= 5) {
+                  navigate('/pricing');
+                  return;
+                }
+                setShowCreate(true);
+              }}>+ New Invoice</button>
             </div>
           </div>
 
@@ -639,10 +646,32 @@ export default function Dashboard() {
           <div className="invoice-panel">
             <div className="panel-header">
               <h2>Recent Invoices</h2>
-              <a href={`https://t.me/${TELEGRAM_BOT_USERNAME}`} target="_blank" rel="noreferrer" className="btn btn-telegram btn-sm">
-                📱 Create via Telegram
-              </a>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <div className="search-bar">
+                  <span className="search-icon">🔍</span>
+                  <input
+                    className="search-input"
+                    type="text"
+                    placeholder="Search by invoice #, client, or date..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  {searchQuery && (
+                    <button className="search-clear" onClick={() => setSearchQuery('')}>×</button>
+                  )}
+                </div>
+                <a href={`https://t.me/${TELEGRAM_BOT_USERNAME}`} target="_blank" rel="noreferrer" className="btn btn-telegram btn-sm">
+                  📱 Create via Telegram
+                </a>
+              </div>
             </div>
+
+            {isFree && countInvoicesThisMonth(invoices) >= 5 && (
+              <div className="limit-banner">
+                <span>⚠️ You've used all 5 free invoices this month.</span>
+                <Link to="/pricing" className="btn btn-accent btn-sm">Upgrade Now</Link>
+              </div>
+            )}
 
             {loading ? (
               <div className="loading-state"><div className="spinner" /></div>
@@ -653,7 +682,25 @@ export default function Dashboard() {
                 <p>Create your first invoice to get started</p>
                 <button className="btn btn-primary" onClick={() => setShowCreate(true)}>Create Invoice</button>
               </div>
-            ) : (
+            ) : (() => {
+              const q = searchQuery.toLowerCase().trim();
+              const filtered = q
+                ? invoices.filter(inv => {
+                    const invNum = (inv.invoiceNumber || '').toLowerCase();
+                    const client = (inv.clientName || '').toLowerCase();
+                    const service = (inv.service || '').toLowerCase();
+                    const dateStr = inv.date ? new Date(inv.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).toLowerCase() : '';
+                    return invNum.includes(q) || client.includes(q) || service.includes(q) || dateStr.includes(q);
+                  })
+                : invoices;
+              return filtered.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-icon">🔍</div>
+                  <h3>No matching invoices</h3>
+                  <p>Try a different search term</p>
+                  <button className="btn btn-secondary" onClick={() => setSearchQuery('')}>Clear Search</button>
+                </div>
+              ) : (
               <div className="table-wrap">
                 <table className="invoice-table">
                   <thead>
@@ -667,7 +714,7 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {invoices.map(inv => (
+                    {filtered.map(inv => (
                       <tr key={inv.id}>
                         <td className="inv-num">{inv.invoiceNumber}</td>
                         <td>{inv.clientName}<br /><span className="inv-service">{inv.service}</span></td>
@@ -698,7 +745,8 @@ export default function Dashboard() {
                   </tbody>
                 </table>
               </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       </div>
