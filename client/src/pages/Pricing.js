@@ -14,7 +14,7 @@ const plans = [
     cta: 'Start Free', ctaClass: 'btn-secondary', href: '/signup',
   },
   {
-    name: 'Pro', monthly: 199, yearly: 159,
+    name: 'Pro', monthly: 199, yearly: 189,
     desc: 'For serious freelancers',
     featured: true,
     features: ['Unlimited invoices', 'Telegram invoicing', 'GST compliant', '3 premium templates', 'Lifetime storage', 'Custom logo support', 'Remove watermark', 'Payment tracking', 'Priority email support'],
@@ -22,7 +22,7 @@ const plans = [
     cta: 'Start Pro Trial', ctaClass: 'btn-primary', href: '/signup',
   },
   {
-    name: 'Business', monthly: 499, yearly: 399,
+    name: 'Business', monthly: 499, yearly: 469,
     desc: 'For agencies and teams',
     features: ['Everything in Pro', '5 team members', 'Multi-business support', 'Expense tracking', 'Advanced analytics', 'API access', 'Accounting integrations', 'Dedicated support', 'White-label option'],
     notIncluded: [],
