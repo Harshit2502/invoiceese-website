@@ -21,7 +21,7 @@ const pool = process.env.DATABASE_URL
 const initializeDatabase = async () => {
   try {
     // Run migrations in order
-    const migrations = ['000_create_users_table.sql', '001_create_conversations_table.sql', '002_add_missing_fields.sql', '003_add_client_fields.sql'];
+    const migrations = ['000_create_users_table.sql', '001_create_conversations_table.sql', '002_add_missing_fields.sql', '003_add_client_fields.sql', '004_add_gst_invoice_fields.sql'];
     
     for (const migration of migrations) {
       const migrationPath = path.join(__dirname, 'migrations', migration);
@@ -57,40 +57,40 @@ const dbExecute = async (text, params) => {
 
 // USER FUNCTIONS
 const createUser = async (userData) => {
-  const { id, email, whatsapp, passwordHash, businessName, gstNumber, panNumber, address, city, pincode, bankName, accountNumber, ifscCode, upiId, logoUrl, templateStyle, showWatermark } = userData;
+  const { id, email, whatsapp, passwordHash, businessName, gstNumber, panNumber, address, city, pincode, state, stateCode, bankName, accountNumber, ifscCode, upiId, logoUrl, templateStyle, showWatermark } = userData;
   
   const result = await pool.query(
-    `INSERT INTO users (id, email, whatsapp, password_hash, business_name, gst_number, pan_number, address, city, pincode, bank_name, account_number, ifsc_code, upi_id, logo_url, template_style, show_watermark, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
-     RETURNING id, email, whatsapp, business_name, gst_number, pan_number, address, city, pincode, bank_name, account_number, ifsc_code, upi_id, plan, invoices_this_month, logo_url as "logoUrl", template_style as "templateStyle", show_watermark as "showWatermark", telegram_chat_id, created_at`,
-    [id, email, whatsapp, passwordHash, businessName, gstNumber, panNumber, address, city, pincode, bankName, accountNumber, ifscCode, upiId, logoUrl || '', templateStyle || 'modern', showWatermark === undefined ? true : showWatermark]
+    `INSERT INTO users (id, email, whatsapp, password_hash, business_name, gst_number, pan_number, address, city, pincode, state, state_code, bank_name, account_number, ifsc_code, upi_id, logo_url, template_style, show_watermark, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW(), NOW())
+     RETURNING id, email, whatsapp, business_name, gst_number, pan_number, address, city, pincode, state, state_code as "stateCode", bank_name, account_number, ifsc_code, upi_id, plan, invoices_this_month, logo_url as "logoUrl", template_style as "templateStyle", show_watermark as "showWatermark", telegram_chat_id, created_at`,
+    [id, email, whatsapp, passwordHash, businessName, gstNumber, panNumber, address, city, pincode, state || '', stateCode || '', bankName, accountNumber, ifscCode, upiId, logoUrl || '', templateStyle || 'modern', showWatermark === undefined ? true : showWatermark]
   );
   return result.rows[0];
 };
 
 const getUserByEmail = async (email) => {
   return dbQuerySingle(
-    `SELECT id, email, whatsapp, password_hash as "passwordHash", business_name as "businessName", gst_number as "gstNumber", pan_number as "panNumber", address, city, pincode, bank_name as "bankName", account_number as "accountNumber", ifsc_code as "ifscCode", upi_id as "upiId", plan, invoices_this_month as "invoicesThisMonth", logo_url as "logoUrl", template_style as "templateStyle", show_watermark as "showWatermark", telegram_chat_id, created_at as "createdAt" FROM users WHERE email = $1`,
+    `SELECT id, email, whatsapp, password_hash as "passwordHash", business_name as "businessName", gst_number as "gstNumber", pan_number as "panNumber", address, city, pincode, state, state_code as "stateCode", bank_name as "bankName", account_number as "accountNumber", ifsc_code as "ifscCode", upi_id as "upiId", plan, invoices_this_month as "invoicesThisMonth", logo_url as "logoUrl", template_style as "templateStyle", show_watermark as "showWatermark", telegram_chat_id, created_at as "createdAt" FROM users WHERE email = $1`,
     [email]
   );
 };
 
 const getUserById = async (id) => {
   return dbQuerySingle(
-    `SELECT id, email, whatsapp, password_hash as "passwordHash", business_name as "businessName", gst_number as "gstNumber", pan_number as "panNumber", address, city, pincode, bank_name as "bankName", account_number as "accountNumber", ifsc_code as "ifscCode", upi_id as "upiId", plan, invoices_this_month as "invoicesThisMonth", logo_url as "logoUrl", template_style as "templateStyle", show_watermark as "showWatermark", telegram_chat_id, created_at as "createdAt" FROM users WHERE id = $1`,
+    `SELECT id, email, whatsapp, password_hash as "passwordHash", business_name as "businessName", gst_number as "gstNumber", pan_number as "panNumber", address, city, pincode, state, state_code as "stateCode", bank_name as "bankName", account_number as "accountNumber", ifsc_code as "ifscCode", upi_id as "upiId", plan, invoices_this_month as "invoicesThisMonth", logo_url as "logoUrl", template_style as "templateStyle", show_watermark as "showWatermark", telegram_chat_id, created_at as "createdAt" FROM users WHERE id = $1`,
     [id]
   );
 };
 
 const getUserByWhatsApp = async (whatsapp) => {
   return dbQuerySingle(
-    `SELECT id, email, whatsapp, password_hash as "passwordHash", business_name as "businessName", gst_number as "gstNumber", pan_number as "panNumber", address, city, pincode, bank_name as "bankName", account_number as "accountNumber", ifsc_code as "ifscCode", upi_id as "upiId", plan, invoices_this_month as "invoicesThisMonth", logo_url as "logoUrl", template_style as "templateStyle", show_watermark as "showWatermark", telegram_chat_id, created_at as "createdAt" FROM users WHERE whatsapp = $1`,
+    `SELECT id, email, whatsapp, password_hash as "passwordHash", business_name as "businessName", gst_number as "gstNumber", pan_number as "panNumber", address, city, pincode, state, state_code as "stateCode", bank_name as "bankName", account_number as "accountNumber", ifsc_code as "ifscCode", upi_id as "upiId", plan, invoices_this_month as "invoicesThisMonth", logo_url as "logoUrl", template_style as "templateStyle", show_watermark as "showWatermark", telegram_chat_id, created_at as "createdAt" FROM users WHERE whatsapp = $1`,
     [whatsapp]
   );
 };
 
 const updateUser = async (userId, updates) => {
-  const allowedFields = ['business_name', 'gst_number', 'pan_number', 'address', 'city', 'pincode', 'bank_name', 'account_number', 'ifsc_code', 'upi_id', 'plan', 'invoices_this_month', 'logo_url', 'template_style', 'show_watermark', 'telegram_chat_id', 'whatsapp'];
+const allowedFields = ['business_name', 'gst_number', 'pan_number', 'address', 'city', 'pincode', 'state', 'state_code', 'bank_name', 'account_number', 'ifsc_code', 'upi_id', 'plan', 'invoices_this_month', 'logo_url', 'template_style', 'show_watermark', 'telegram_chat_id', 'whatsapp'];
   
   // Convert camelCase to snake_case for DB fields if needed
   const mappedUpdates = {};
@@ -124,29 +124,29 @@ const updateUserPassword = async (userId, newPasswordHash) => {
 
 // INVOICE FUNCTIONS
 const createInvoice = async (invoiceData) => {
-  const { id, userId, invoiceNumber, clientName, clientGst, clientAddress, clientMobile, service, items, amount, gstRate, gstAmount, totalAmount, notes, dueDate, pdfUrl, status, date } = invoiceData;
+  const { id, userId, invoiceNumber, clientName, clientGst, clientAddress, clientMobile, clientState, clientStateCode, reverseCharge, transportMode, vehicleNumber, dateOfSupply, placeOfSupply, service, items, amount, gstRate, gstAmount, cgst, sgst, igst, gstType, totalAmount, notes, dueDate, pdfUrl, status, date } = invoiceData;
   
   const itemsJson = items ? JSON.stringify(items) : '[]';
   
   const result = await pool.query(
-    `INSERT INTO invoices (id, user_id, invoice_number, client_name, client_gst, client_address, client_mobile, service_description, items, subtotal, gst_rate, gst_amount, cgst, sgst, igst, total, gst_type, notes, due_date, pdf_url, status, invoice_date, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, 'intrastate', $17, $18, $19, $20, $21, NOW(), NOW())
+    `INSERT INTO invoices (id, user_id, invoice_number, client_name, client_gst, client_address, client_mobile, client_state, client_state_code, reverse_charge, transport_mode, vehicle_number, date_of_supply, place_of_supply, service_description, items, subtotal, gst_rate, gst_amount, cgst, sgst, igst, total, gst_type, notes, due_date, pdf_url, status, invoice_date, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, NOW(), NOW())
      RETURNING *`,
-    [id, userId, invoiceNumber, clientName, clientGst, clientAddress || null, clientMobile || null, service, itemsJson, amount, gstRate, gstAmount, gstAmount/2, gstAmount/2, 0, totalAmount, notes || '', dueDate || null, pdfUrl || null, status, date]
+    [id, userId, invoiceNumber, clientName, clientGst, clientAddress || null, clientMobile || null, clientState || null, clientStateCode || null, reverseCharge || false, transportMode || null, vehicleNumber || null, dateOfSupply || null, placeOfSupply || null, service, itemsJson, amount, gstRate, gstAmount, cgst !== undefined ? cgst : gstAmount/2, sgst !== undefined ? sgst : gstAmount/2, igst || 0, totalAmount, gstType || 'intrastate', notes || '', dueDate || null, pdfUrl || null, status, date]
   );
   return result.rows[0];
 };
 
 const getInvoiceById = async (invoiceId) => {
   return dbQuerySingle(
-    `SELECT id, user_id as "userId", invoice_number as "invoiceNumber", client_name as "clientName", client_gst as "clientGst", client_address as "clientAddress", client_mobile as "clientMobile", service_description as "service", items, subtotal as "amount", gst_rate as "gstRate", gst_amount as "gstAmount", cgst, sgst, igst, total as "totalAmount", gst_type as "gstType", pdf_url as "pdfUrl", notes, due_date as "dueDate", payment_details as "payment", status, invoice_date as "date", created_at as "createdAt" FROM invoices WHERE id = $1`,
+    `SELECT id, user_id as "userId", invoice_number as "invoiceNumber", client_name as "clientName", client_gst as "clientGst", client_address as "clientAddress", client_mobile as "clientMobile", client_state as "clientState", client_state_code as "clientStateCode", reverse_charge as "reverseCharge", transport_mode as "transportMode", vehicle_number as "vehicleNumber", date_of_supply as "dateOfSupply", place_of_supply as "placeOfSupply", service_description as "service", items, subtotal as "amount", gst_rate as "gstRate", gst_amount as "gstAmount", cgst, sgst, igst, total as "totalAmount", gst_type as "gstType", pdf_url as "pdfUrl", notes, due_date as "dueDate", payment_details as "payment", status, invoice_date as "date", created_at as "createdAt" FROM invoices WHERE id = $1`,
     [invoiceId]
   );
 };
 
 const getUserInvoices = async (userId) => {
   return dbQuery(
-    `SELECT id, user_id as "userId", invoice_number as "invoiceNumber", client_name as "clientName", client_gst as "clientGst", client_address as "clientAddress", client_mobile as "clientMobile", service_description as "service", items, subtotal as "amount", gst_rate as "gstRate", gst_amount as "gstAmount", cgst, sgst, igst, total as "totalAmount", gst_type as "gstType", pdf_url as "pdfUrl", notes, due_date as "dueDate", payment_details as "payment", status, invoice_date as "date", created_at as "createdAt" FROM invoices WHERE user_id = $1 ORDER BY created_at DESC`,
+    `SELECT id, user_id as "userId", invoice_number as "invoiceNumber", client_name as "clientName", client_gst as "clientGst", client_address as "clientAddress", client_mobile as "clientMobile", client_state as "clientState", client_state_code as "clientStateCode", reverse_charge as "reverseCharge", transport_mode as "transportMode", vehicle_number as "vehicleNumber", date_of_supply as "dateOfSupply", place_of_supply as "placeOfSupply", service_description as "service", items, subtotal as "amount", gst_rate as "gstRate", gst_amount as "gstAmount", cgst, sgst, igst, total as "totalAmount", gst_type as "gstType", pdf_url as "pdfUrl", notes, due_date as "dueDate", payment_details as "payment", status, invoice_date as "date", created_at as "createdAt" FROM invoices WHERE user_id = $1 ORDER BY created_at DESC`,
     [userId]
   );
 };

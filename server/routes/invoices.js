@@ -120,7 +120,7 @@ router.post('/', async (req, res) => {
     return res.status(403).json({ error: 'Free plan limit reached (5 invoices/month). Please upgrade.' });
   }
 
-  const { clientName, clientGst, clientAddress, clientMobile, service, amount, items, gstRate = 18, notes, dueDate, templateStyle } = req.body;
+  const { clientName, clientGst, clientAddress, clientMobile, clientState, clientStateCode, reverseCharge, transportMode, vehicleNumber, dateOfSupply, placeOfSupply, service, amount, items, gstRate = 18, notes, dueDate, templateStyle } = req.body;
   if (!clientName) {
     return res.status(400).json({ error: 'Client name is required' });
   }
@@ -133,6 +133,7 @@ router.post('/', async (req, res) => {
         return {
           description,
           hsn: String(item.hsn || '').trim(),
+          uom: String(item.uom || 'PCS.').trim(),
           quantity,
           unitPrice,
           amount: Number((quantity * unitPrice).toFixed(2)),
@@ -149,6 +150,7 @@ router.post('/', async (req, res) => {
     }
     normalizedItems.push({
       description: fallbackService,
+      uom: 'PCS.',
       quantity: 1,
       unitPrice: fallbackAmount,
       amount: Number(fallbackAmount.toFixed(2)),
@@ -183,6 +185,9 @@ router.post('/', async (req, res) => {
     ? templateStyle
     : null;
 
+  const isInterstate = (user && user.stateCode && clientStateCode && user.stateCode !== clientStateCode);
+  const calculatedGstType = isInterstate ? 'interstate' : 'intrastate';
+
   const invoice = {
     id: uuidv4(),
     userId: req.userId,
@@ -191,11 +196,22 @@ router.post('/', async (req, res) => {
     clientGst: user.gstNumber ? clientGst : '',
     clientAddress,
     clientMobile,
+    clientState,
+    clientStateCode,
+    reverseCharge: Boolean(reverseCharge),
+    transportMode,
+    vehicleNumber,
+    dateOfSupply,
+    placeOfSupply,
     service: normalizedItems[0].description,
     items: normalizedItems,
     amount: parsedAmount,
     gstRate: parsedGstRate,
     gstAmount,
+    cgst: (!isInterstate && parsedGstRate > 0) ? Number(((parsedAmount * parsedGstRate) / 100 / 2).toFixed(2)) : 0,
+    sgst: (!isInterstate && parsedGstRate > 0) ? Number(((parsedAmount * parsedGstRate) / 100 / 2).toFixed(2)) : 0,
+    igst: (isInterstate && parsedGstRate > 0) ? Number(((parsedAmount * parsedGstRate) / 100).toFixed(2)) : 0,
+    gstType: calculatedGstType,
     totalAmount,
     notes: notes || '',
     dueDate: dueDate || null,
@@ -222,11 +238,6 @@ router.post('/', async (req, res) => {
       ...invoice,
       items: normalizedItems,
       subtotal: parsedAmount,
-      cgst: parsedGstRate > 0 ? Number(((parsedAmount * parsedGstRate) / 100 / 2).toFixed(2)) : 0,
-      sgst: parsedGstRate > 0 ? Number(((parsedAmount * parsedGstRate) / 100 / 2).toFixed(2)) : 0,
-      igst: 0,
-      total: totalAmount,
-      gstType: 'intrastate',
       gstApplicable: parsedGstRate > 0,
     };
 

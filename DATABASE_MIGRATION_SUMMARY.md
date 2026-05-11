@@ -1,4 +1,4 @@
-# PostgreSQL Integration - Setup Summary
+  # PostgreSQL Integration - Setup Summary
 
 Date: April 2, 2026
 

@@ -107,7 +107,7 @@ router.patch('/profile', async (req, res) => {
     req.body.whatsapp = normalizedWhatsApp;
   }
 
-  const allowed = ['businessName', 'gstNumber', 'panNumber', 'address', 'city', 'pincode', 'bankName', 'accountNumber', 'ifscCode', 'upiId', 'whatsapp', 'logoUrl', 'templateStyle', 'showWatermark'];
+  const allowed = ['businessName', 'gstNumber', 'panNumber', 'address', 'city', 'pincode', 'state', 'stateCode', 'bankName', 'accountNumber', 'ifscCode', 'upiId', 'whatsapp', 'logoUrl', 'templateStyle', 'showWatermark'];
   
   if (process.env.USE_POSTGRES === 'true') {
     const pgFunctions = require('../db-postgres');

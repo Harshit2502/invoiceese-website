@@ -65,7 +65,14 @@ export default function Dashboard() {
     clientGst: '',
     clientAddress: '',
     clientMobile: '',
-    items: [{ description: '', hsn: '', quantity: 1, unitPrice: '' }],
+    clientState: '',
+    clientStateCode: '',
+    reverseCharge: false,
+    transportMode: '',
+    vehicleNumber: '',
+    dateOfSupply: '',
+    placeOfSupply: '',
+    items: [{ description: '', hsn: '', uom: 'PCS.', quantity: 1, unitPrice: '' }],
     gstRate: 18,
     notes: '',
     templateStyle: 'modern',
@@ -152,7 +159,7 @@ export default function Dashboard() {
   const addItemRow = () => {
     setCreateForm((prev) => ({
       ...prev,
-      items: [...prev.items, { description: '', hsn: '', quantity: 1, unitPrice: '' }],
+      items: [...prev.items, { description: '', hsn: '', uom: 'PCS.', quantity: 1, unitPrice: '' }],
     }));
   };
 
@@ -190,6 +197,7 @@ export default function Dashboard() {
             items: (createForm.items || []).map((item) => ({
               description: String(item.description || '').trim(),
               hsn: hasGst ? String(item.hsn || '').trim() : '',
+              uom: String(item.uom || 'PCS.').trim(),
               quantity: Number(item.quantity) || 0,
               unitPrice: Number(item.unitPrice) || 0,
             })),
@@ -208,7 +216,14 @@ export default function Dashboard() {
         clientGst: '',
         clientAddress: '',
         clientMobile: '',
-        items: [{ description: '', hsn: '', quantity: 1, unitPrice: '' }],
+        clientState: '',
+        clientStateCode: '',
+        reverseCharge: false,
+        transportMode: '',
+        vehicleNumber: '',
+        dateOfSupply: '',
+        placeOfSupply: '',
+        items: [{ description: '', hsn: '', uom: 'PCS.', quantity: 1, unitPrice: '' }],
         gstRate: hasGst ? 18 : 0,
         notes: '',
         templateStyle: isPro ? (user?.templateStyle || 'modern') : 'modern',
@@ -302,7 +317,9 @@ export default function Dashboard() {
         method: 'PATCH',
         body: JSON.stringify({ 
           logoUrl: nextLogoUrl,
-          gstNumber: settingsForm.gstNumber 
+          gstNumber: settingsForm.gstNumber,
+          state: settingsForm.state,
+          stateCode: settingsForm.stateCode
         }),
       });
       const profileData = await profileRes.json();
@@ -469,9 +486,47 @@ export default function Dashboard() {
                     </div>
                   </div>
                   {hasGst && (
-                    <div className="form-group">
-                      <label className="form-label">Client GSTIN <span className="optional-tag">(Optional)</span></label>
-                      <input className="form-input" name="clientGst" value={createForm.clientGst || ''} onChange={handleCreateChange} placeholder="22AAAAA0000A1Z5" />
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">Client GSTIN <span className="optional-tag">(Optional)</span></label>
+                        <input className="form-input" name="clientGst" value={createForm.clientGst || ''} onChange={handleCreateChange} placeholder="22AAAAA0000A1Z5" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Client State <span className="optional-tag">(Optional)</span></label>
+                        <input className="form-input" name="clientState" value={createForm.clientState || ''} onChange={handleCreateChange} placeholder="Gujarat" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">State Code <span className="optional-tag">(Optional)</span></label>
+                        <input className="form-input" name="clientStateCode" value={createForm.clientStateCode || ''} onChange={handleCreateChange} placeholder="24" style={{ maxWidth: '80px' }} />
+                      </div>
+                    </div>
+                  )}
+                  {hasGst && (
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">Transport Mode <span className="optional-tag">(Optional)</span></label>
+                        <input className="form-input" name="transportMode" value={createForm.transportMode || ''} onChange={handleCreateChange} placeholder="Road" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Vehicle Number <span className="optional-tag">(Optional)</span></label>
+                        <input className="form-input" name="vehicleNumber" value={createForm.vehicleNumber || ''} onChange={handleCreateChange} placeholder="GJ-05-XX-0000" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Date of Supply <span className="optional-tag">(Optional)</span></label>
+                        <input className="form-input" type="date" name="dateOfSupply" value={createForm.dateOfSupply || ''} onChange={handleCreateChange} />
+                      </div>
+                    </div>
+                  )}
+                  {hasGst && (
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">Place of Supply <span className="optional-tag">(Optional)</span></label>
+                        <input className="form-input" name="placeOfSupply" value={createForm.placeOfSupply || ''} onChange={handleCreateChange} placeholder="Gujarat" />
+                      </div>
+                      <div className="form-group" style={{ display: 'flex', alignItems: 'center', marginTop: '30px' }}>
+                        <input type="checkbox" id="reverseCharge" name="reverseCharge" checked={createForm.reverseCharge || false} onChange={e => setCreateForm(f => ({ ...f, reverseCharge: e.target.checked }))} style={{ marginRight: '10px' }} />
+                        <label htmlFor="reverseCharge" className="form-label" style={{ marginBottom: 0 }}>Reverse Charge (Y/N)</label>
+                      </div>
                     </div>
                   )}
                   <div className="form-group">
@@ -496,12 +551,20 @@ export default function Dashboard() {
                         )}
                         <input
                           className="form-input"
+                          placeholder="UOM"
+                          value={item.uom}
+                          onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
+                          style={{ maxWidth: '80px' }}
+                        />
+                        <input
+                          className="form-input"
                           type="number"
                           min="1"
                           placeholder="Qty"
                           value={item.quantity}
                           onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
                           required
+                          style={{ maxWidth: '80px' }}
                         />
                         <input
                           className="form-input"
@@ -596,6 +659,27 @@ export default function Dashboard() {
                       placeholder="Leave blank for Non-GST Invoices" 
                     />
                     <p className="form-helper">Adding a GST number upgrades your invoices to "Tax Invoices" with CGST/SGST breakdowns.</p>
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label className="form-label">Business State</label>
+                      <input 
+                        className="form-input" 
+                        value={settingsForm.state} 
+                        onChange={(e) => setSettingsForm(f => ({ ...f, state: e.target.value }))} 
+                        placeholder="e.g. Gujarat" 
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">State Code</label>
+                      <input 
+                        className="form-input" 
+                        value={settingsForm.stateCode} 
+                        onChange={(e) => setSettingsForm(f => ({ ...f, stateCode: e.target.value }))} 
+                        placeholder="e.g. 24" 
+                      />
+                    </div>
                   </div>
 
                   <div className="form-group">
