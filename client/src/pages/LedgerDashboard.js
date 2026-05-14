@@ -24,21 +24,22 @@ function Sidebar({ screen, setScreen, user, logout }) {
     { icon: BarChart2, label: "Analytics", s: 4 },
   ];
   return (
-    <div style={{ width: 220, background: "#f9fafb", borderRight: "1px solid #e5e7eb", display: "flex", flexDirection: "column", flexShrink: 0, height: "100vh" }}>
-      <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #e5e7eb" }}>
+    <div className="dashboard-sidebar">
+      <div className="sidebar-header" style={{ padding: "20px 20px 16px", borderBottom: "1px solid #e5e7eb" }}>
         <div style={{ fontWeight: 700, fontSize: 18, color: T }}>InvoiceEase</div>
         <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>Business Manager</div>
       </div>
-      <div style={{ padding: "12px 0", flex: 1 }}>
+      <div className="sidebar-nav" style={{ padding: "12px 0", flex: 1 }}>
         {nav.map(({ icon: Icon, label, s }) => (
           <button key={label} onClick={() => s !== null && setScreen(s)}
+            className={`sidebar-btn ${screen === s ? 'active' : ''}`}
             style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "12px 20px", background: screen === s ? TL : "transparent", color: screen === s ? T : "#6b7280", border: "none", cursor: s !== null ? "pointer" : "not-allowed", fontSize: 14, textAlign: "left", borderLeft: screen === s ? `4px solid ${T}` : "4px solid transparent", opacity: s === null ? 0.45 : 1 }}>
             <Icon size={16} />
             <span style={{ fontWeight: screen === s ? 600 : 400 }}>{label}</span>
           </button>
         ))}
       </div>
-      <div style={{ padding: "16px 20px", borderTop: "1px solid #e5e7eb", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="sidebar-footer" style={{ padding: "16px 20px", borderTop: "1px solid #e5e7eb", display: "flex", flexDirection: "column", gap: 12 }}>
         <div>
           <div style={{ fontSize: 13, color: "#374151", fontWeight: 600 }}>{user?.businessName || 'My Business'}</div>
           <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{user?.plan === 'free' ? 'Free Plan' : 'Pro Plan'} · {user?.gstNumber ? 'GST Registered' : 'Unregistered'}</div>
@@ -54,7 +55,7 @@ function Sidebar({ screen, setScreen, user, logout }) {
 
 function Dashboard({ setScreen, user, stats, monthData, recentInvoices }) {
   return (
-    <div style={{ flex: 1, padding: 30, overflowY: "auto", background: "#fff" }}>
+    <div className="dashboard-main">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 30 }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 700, color: "#111827" }}>Good morning, {user?.email?.split('@')[0] || 'User'}</div>
@@ -65,7 +66,7 @@ function Dashboard({ setScreen, user, stats, monthData, recentInvoices }) {
         </button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 30 }}>
+      <div className="stats-grid">
         {[
           { label: "Revenue", value: `₹${stats.revenue.toLocaleString()}`, delta: "+8.6%", up: true },
           { label: "Purchases", value: `₹${stats.purchases.toLocaleString()}`, delta: "+6.5%", up: false },
@@ -97,7 +98,8 @@ function Dashboard({ setScreen, user, stats, monthData, recentInvoices }) {
       </div>
 
       <div style={{ fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 12 }}>Recent transactions</div>
-      <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", fontSize: 13 }}>
+      <div className="table-responsive">
+        <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", fontSize: 13, minWidth: "600px" }}>
         {recentInvoices.map((r, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", padding: "12px 20px", borderTop: i > 0 ? "1px solid #f3f4f6" : "none", background: "#fff", gap: 16 }}>
             <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 4, flexShrink: 0, background: r.type === "SALE" ? "#dbeafe" : "#fef3c7", color: r.type === "SALE" ? "#1e40af" : "#78350f" }}>{r.type}</span>
@@ -110,6 +112,7 @@ function Dashboard({ setScreen, user, stats, monthData, recentInvoices }) {
         {recentInvoices.length === 0 && (
           <div style={{ padding: 20, textAlign: "center", color: "#6b7280" }}>No transactions yet. Upload a purchase invoice or create a sales invoice.</div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -140,7 +143,7 @@ function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoi
   const rows = tab === "purchase" ? purchaseRows : salesRows;
 
   return (
-    <div style={{ flex: 1, padding: 30, background: "#fff", overflowY: "auto" }}>
+    <div className="dashboard-main">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <div style={{ fontSize: 20, fontWeight: 700, color: "#111827" }}>Invoice Hub</div>
         {tab === "purchase" && (
@@ -161,7 +164,8 @@ function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoi
           </button>
         ))}
       </div>
-      <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", fontSize: 13 }}>
+      <div className="table-responsive">
+        <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", fontSize: 13, minWidth: "800px" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 100px 120px 100px 70px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", padding: "10px 20px", gap: 12, fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 }}>
           <span>Invoice no</span><span>{tab === "purchase" ? "Supplier" : "Customer"}</span><span>Date</span><span>Amount</span><span>Status</span><span style={{ textAlign: 'right' }}>Actions</span>
         </div>
@@ -202,6 +206,7 @@ function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoi
         {rows.length === 0 && (
           <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>No invoices found in this category.</div>
         )}
+        </div>
       </div>
       {tab === "purchase" && (
         <div style={{ marginTop: 20, padding: "12px 16px", background: TL, borderRadius: 10, fontSize: 13, color: "#065f46", display: "flex", gap: 10, alignItems: "flex-start" }}>
@@ -251,7 +256,7 @@ function UploadInvoice({ setScreen, authFetch, setExtractedData }) {
   };
 
   return (
-    <div style={{ flex: 1, padding: 30, background: "#fff", overflowY: "auto" }}>
+    <div className="dashboard-main">
       <div style={{ fontSize: 20, fontWeight: 700, color: "#111827", marginBottom: 6 }}>Upload Purchase Invoice</div>
       <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 30 }}>Our AI reads and extracts all details — works on PDFs, photos, even blurry WhatsApp images</div>
 
@@ -325,7 +330,7 @@ function ReviewExtraction({ setScreen, extractedData, authFetch, fetchPurchases,
   if (!extractedData) return <div style={{ padding: 30 }}>No data extracted. Please go back and upload an invoice.</div>;
 
   return (
-    <div style={{ flex: 1, padding: 30, background: "#fff", overflowY: "auto" }}>
+    <div className="dashboard-main">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 700, color: "#111827" }}>Review Extracted Data</div>
@@ -334,7 +339,7 @@ function ReviewExtraction({ setScreen, extractedData, authFetch, fetchPurchases,
         <div style={{ background: "#d1fae5", color: "#065f46", fontSize: 12, padding: "6px 12px", borderRadius: 8, fontWeight: 600 }}>96% confidence</div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div className="settings-grid">
         {/* Extracted fields */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
@@ -404,11 +409,11 @@ function Analytics({ products, stats }) {
   });
 
   return (
-    <div style={{ flex: 1, padding: 30, background: "#fff", overflowY: "auto" }}>
+    <div className="dashboard-main">
       <div style={{ fontSize: 20, fontWeight: 700, color: "#111827", marginBottom: 6 }}>Business Analytics</div>
       <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 30 }}>Auto-generated from your sales & purchase invoices</div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 30 }}>
+      <div className="stats-grid">
         {[
           { label: "Gross profit (Current)", value: `₹${(stats.revenue - stats.purchases).toLocaleString()}`, sub: "Derived from invoices" },
           { label: "Total products in inventory", value: products.length, sub: "Unique SKUs" },
@@ -441,10 +446,11 @@ function Analytics({ products, stats }) {
       )}
 
       <div style={{ fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 12 }}>Live Stock Levels</div>
-      <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", fontSize: 13 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1.6fr 80px 80px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", padding: "10px 20px", gap: 12, fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 }}>
-          <span>Product</span><span style={{ textAlign: "right" }}>Stock</span><span style={{ textAlign: "right" }}>Margin</span>
-        </div>
+      <div className="table-responsive">
+        <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", fontSize: 13, minWidth: "500px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.6fr 80px 80px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", padding: "10px 20px", gap: 12, fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 }}>
+            <span>Product</span><span style={{ textAlign: "right" }}>Stock</span><span style={{ textAlign: "right" }}>Margin</span>
+          </div>
         {inventoryData.map((r, i) => (
           <div key={i} style={{ display: "grid", gridTemplateColumns: "1.6fr 80px 80px", padding: "12px 20px", gap: 12, borderTop: i > 0 ? "1px solid #f3f4f6" : "none", background: "#fff", alignItems: "center" }}>
             <span style={{ color: "#374151", fontWeight: 500 }}>{r.name}</span>
@@ -457,6 +463,7 @@ function Analytics({ products, stats }) {
         {inventoryData.length === 0 && (
           <div style={{ padding: 20, textAlign: "center", color: "#6b7280" }}>No products in inventory.</div>
         )}
+        </div>
       </div>
       
       {inventoryData.some(p => p.remaining <= 6) && (
@@ -590,7 +597,7 @@ export default function LedgerDashboard() {
   }
 
   return (
-    <div style={{ fontFamily: "system-ui, sans-serif", display: "flex", height: "100vh", background: "#fff", color: "#111827" }}>
+    <div className="dashboard-layout">
       <Sidebar screen={screen} setScreen={setScreen} user={user} logout={logout} />
       {screen === 0 && <Dashboard setScreen={setScreen} user={user} stats={stats} monthData={monthData} recentInvoices={recentInvoices} />}
       {screen === 1 && <InvoiceHub setScreen={setScreen} invoices={invoices} purchases={purchases} setShowCreate={setShowCreate} updateInvoiceStatus={updateInvoiceStatus} statusUpdating={statusUpdating} deleteInvoice={deleteInvoice} />}

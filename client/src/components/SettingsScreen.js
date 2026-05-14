@@ -138,7 +138,7 @@ export default function SettingsScreen({ user, setUser, authFetch }) {
   };
 
   return (
-    <div style={{ flex: 1, padding: 30, background: "#fff", overflowY: "auto" }}>
+    <div className="dashboard-main">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
         <div>
           <div style={{ fontSize: 24, fontWeight: 700, color: "#111827" }}>Business Settings</div>
@@ -151,7 +151,7 @@ export default function SettingsScreen({ user, setUser, authFetch }) {
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 30 }}>
+      <div className="settings-grid">
         
         {/* Main Settings Form */}
         <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24 }}>
@@ -169,12 +169,12 @@ export default function SettingsScreen({ user, setUser, authFetch }) {
               <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>Adding a GST number upgrades your invoices to "Tax Invoices" with CGST/SGST breakdowns.</div>
             </div>
 
-            <div style={{ display: "flex", gap: 16 }}>
-              <div style={{ flex: 1 }}>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 120px" }}>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Business State</label>
                 <input style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} value={settingsForm.state} onChange={(e) => setSettingsForm(f => ({ ...f, state: e.target.value }))} placeholder="e.g. Gujarat" />
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: "1 1 120px" }}>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>State Code</label>
                 <input style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} value={settingsForm.stateCode} onChange={(e) => setSettingsForm(f => ({ ...f, stateCode: e.target.value }))} placeholder="e.g. 24" />
               </div>

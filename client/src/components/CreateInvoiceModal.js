@@ -111,7 +111,7 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
-      <div style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 700, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+      <div className="modal-card" style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 700, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 10 }}>
           <h2 style={{ margin: 0, fontSize: 18, color: '#111827' }}>Create Sales Invoice</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#6b7280' }}>&times;</button>
@@ -126,12 +126,12 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
               <input style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} name="clientName" value={createForm.clientName} onChange={handleCreateChange} placeholder="Acme Corporation" required />
             </div>
             
-            <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-              <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 200px' }}>
                 <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Client Address</label>
                 <input style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} name="clientAddress" value={createForm.clientAddress || ''} onChange={handleCreateChange} placeholder="123 Street, City" />
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: '1 1 200px' }}>
                 <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Client Mobile</label>
                 <input style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} name="clientMobile" value={createForm.clientMobile || ''} onChange={handleCreateChange} placeholder="9876543210" />
               </div>
@@ -139,42 +139,42 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
 
             {hasGst && (
               <>
-                <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-                  <div style={{ flex: 2 }}>
+                <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+                  <div style={{ flex: '2 1 150px' }}>
                     <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Client GSTIN</label>
                     <input style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} name="clientGst" value={createForm.clientGst || ''} onChange={handleCreateChange} placeholder="22AAAAA0000A1Z5" />
                   </div>
-                  <div style={{ flex: 2 }}>
+                  <div style={{ flex: '2 1 120px' }}>
                     <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Client State</label>
                     <input style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} name="clientState" value={createForm.clientState || ''} onChange={handleCreateChange} placeholder="Gujarat" />
                   </div>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: '1 1 80px' }}>
                     <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>State Code</label>
                     <input style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} name="clientStateCode" value={createForm.clientStateCode || ''} onChange={handleCreateChange} placeholder="24" />
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-                  <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 120px' }}>
                     <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Transport Mode</label>
                     <input style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} name="transportMode" value={createForm.transportMode || ''} onChange={handleCreateChange} placeholder="Road" />
                   </div>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: '1 1 120px' }}>
                     <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Vehicle Number</label>
                     <input style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} name="vehicleNumber" value={createForm.vehicleNumber || ''} onChange={handleCreateChange} placeholder="GJ-05-XX-0000" />
                   </div>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: '1 1 120px' }}>
                     <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Date of Supply</label>
                     <input style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} type="date" name="dateOfSupply" value={createForm.dateOfSupply || ''} onChange={handleCreateChange} />
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
-                  <div style={{ flex: 2 }}>
+                <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
+                  <div style={{ flex: '2 1 200px' }}>
                     <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Place of Supply</label>
                     <input style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} name="placeOfSupply" value={createForm.placeOfSupply || ''} onChange={handleCreateChange} placeholder="Gujarat" />
                   </div>
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', paddingTop: 20 }}>
+                  <div style={{ flex: '1 1 150px', display: 'flex', alignItems: 'center', paddingTop: 20 }}>
                     <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 13, color: '#374151' }}>
                       <input type="checkbox" checked={createForm.reverseCharge || false} onChange={e => setCreateForm(f => ({ ...f, reverseCharge: e.target.checked }))} style={{ marginRight: 8 }} />
                       Reverse Charge (Y/N)
@@ -187,9 +187,9 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
             <div style={{ marginBottom: 24 }}>
               <label style={{ display: 'block', marginBottom: 12, fontSize: 13, fontWeight: 600, color: '#374151' }}>Invoice Items *</label>
               {(createForm.items || []).map((item, index) => (
-                <div key={index} style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <div key={index} style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
                   <input
-                    style={{ flex: 2, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }}
+                    style={{ flex: '1 1 200px', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }}
                     placeholder="Item description"
                     value={item.description}
                     onChange={(e) => handleItemChange(index, 'description', e.target.value)}
@@ -197,20 +197,20 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
                   />
                   {hasGst && (
                     <input
-                      style={{ width: 80, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }}
+                      style={{ flex: '1 1 80px', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }}
                       placeholder="HSN"
                       value={item.hsn || ''}
                       onChange={(e) => handleItemChange(index, 'hsn', e.target.value)}
                     />
                   )}
                   <input
-                    style={{ width: 70, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }}
+                    style={{ flex: '1 1 70px', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }}
                     placeholder="UOM"
                     value={item.uom}
                     onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
                   />
                   <input
-                    style={{ width: 80, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }}
+                    style={{ flex: '1 1 80px', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }}
                     type="number" min="1"
                     placeholder="Qty"
                     value={item.quantity}
@@ -218,7 +218,7 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
                     required
                   />
                   <input
-                    style={{ width: 100, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }}
+                    style={{ flex: '1 1 100px', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }}
                     type="number" min="0" step="0.01"
                     placeholder="Price"
                     value={item.unitPrice}
@@ -238,9 +238,9 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
               <button type="button" onClick={addItemRow} style={{ padding: '6px 12px', background: '#eef2ff', color: '#4f46e5', border: '1px solid #c7d2fe', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 500, marginTop: 4 }}>+ Add Line Item</button>
             </div>
 
-            <div style={{ display: 'flex', gap: 20, marginBottom: 24 }}>
+            <div style={{ display: 'flex', gap: 20, marginBottom: 24, flexWrap: 'wrap' }}>
               {hasGst && (
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: '1 1 200px' }}>
                   <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>GST Rate (%)</label>
                   <select style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box', background: '#fff' }} name="gstRate" value={createForm.gstRate} onChange={handleCreateChange}>
                     <option value={0}>0% (Exempt)</option>
@@ -252,7 +252,7 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
                 </div>
               )}
               {isPro && (
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: '1 1 200px' }}>
                   <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Template Style</label>
                   <select style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box', background: '#fff' }} name="templateStyle" value={createForm.templateStyle} onChange={handleCreateChange}>
                     <option value="modern">Modern (Tabular)</option>
@@ -279,7 +279,7 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, borderTop: '1px solid #e5e7eb', paddingTop: 20 }}>
+            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, borderTop: '1px solid #e5e7eb', paddingTop: 20 }}>
               <button type="button" onClick={onClose} style={{ padding: '10px 16px', background: '#fff', border: '1px solid #d1d5db', borderRadius: 8, cursor: 'pointer', fontWeight: 600, color: '#374151' }}>Cancel</button>
               <button type="submit" disabled={creating} style={{ padding: '10px 20px', background: '#0F6E56', border: 'none', borderRadius: 8, cursor: creating ? 'not-allowed' : 'pointer', fontWeight: 600, color: '#fff', opacity: creating ? 0.7 : 1 }}>
                 {creating ? 'Creating...' : 'Create Sales Invoice'}
