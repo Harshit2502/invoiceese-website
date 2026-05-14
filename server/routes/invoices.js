@@ -125,21 +125,48 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Client name is required' });
   }
 
-  const normalizedItems = Array.isArray(items) && items.length > 0
-    ? items.map((item) => {
-        const description = String(item.description || '').trim();
-        const quantity = Number(item.quantity);
-        const unitPrice = Number(item.unitPrice);
-        return {
-          description,
-          hsn: String(item.hsn || '').trim(),
-          uom: String(item.uom || 'PCS.').trim(),
-          quantity,
-          unitPrice,
-          amount: Number((quantity * unitPrice).toFixed(2)),
-        };
-      }).filter((item) => item.description && Number.isFinite(item.quantity) && item.quantity > 0 && Number.isFinite(item.unitPrice) && item.unitPrice > 0)
-    : [];
+  let normalizedItems = [];
+  if (Array.isArray(items) && items.length > 0) {
+    const validItems = items.filter((item) => item.description && Number.isFinite(Number(item.quantity)) && Number(item.quantity) > 0 && Number.isFinite(Number(item.unitPrice)) && Number(item.unitPrice) > 0);
+    
+    normalizedItems = await Promise.all(validItems.map(async (item) => {
+      const description = String(item.description || '').trim();
+      const quantity = Number(item.quantity);
+      const unitPrice = Number(item.unitPrice);
+      let productId = null;
+
+      if (process.env.USE_POSTGRES === 'true') {
+        const pgFunctions = require('../db-postgres');
+        const { v4: uuidv4 } = require('uuid');
+        
+        // Find or create product
+        let product = await pgFunctions.getProductByName(req.userId, description);
+        if (!product) {
+          product = await pgFunctions.createProduct({
+            id: uuidv4(),
+            userId: req.userId,
+            name: description,
+            sku: String(item.hsn || '').trim(), // Use HSN as SKU fallback
+            sellingPrice: unitPrice
+          });
+        }
+        productId = product.id;
+        
+        // Decrease stock
+        await pgFunctions.updateProductStock(productId, -quantity);
+      }
+
+      return {
+        productId,
+        description,
+        hsn: String(item.hsn || '').trim(),
+        uom: String(item.uom || 'PCS.').trim(),
+        quantity,
+        unitPrice,
+        amount: Number((quantity * unitPrice).toFixed(2)),
+      };
+    }));
+  }
 
   // Backward compatibility: if no items are provided, use single service+amount input.
   if (normalizedItems.length === 0) {
@@ -148,7 +175,26 @@ router.post('/', async (req, res) => {
     if (!fallbackService || !Number.isFinite(fallbackAmount) || fallbackAmount <= 0) {
       return res.status(400).json({ error: 'At least one valid item is required' });
     }
+    
+    let productId = null;
+    if (process.env.USE_POSTGRES === 'true') {
+      const pgFunctions = require('../db-postgres');
+      const { v4: uuidv4 } = require('uuid');
+      let product = await pgFunctions.getProductByName(req.userId, fallbackService);
+      if (!product) {
+        product = await pgFunctions.createProduct({
+          id: uuidv4(),
+          userId: req.userId,
+          name: fallbackService,
+          sellingPrice: fallbackAmount
+        });
+      }
+      productId = product.id;
+      await pgFunctions.updateProductStock(productId, -1);
+    }
+
     normalizedItems.push({
+      productId,
       description: fallbackService,
       uom: 'PCS.',
       quantity: 1,

@@ -21,7 +21,7 @@ const pool = process.env.DATABASE_URL
 const initializeDatabase = async () => {
   try {
     // Run migrations in order
-    const migrations = ['000_create_users_table.sql', '001_create_conversations_table.sql', '002_add_missing_fields.sql', '003_add_client_fields.sql', '004_add_gst_invoice_fields.sql'];
+    const migrations = ['000_create_users_table.sql', '001_create_conversations_table.sql', '002_add_missing_fields.sql', '003_add_client_fields.sql', '004_add_gst_invoice_fields.sql', '005_add_inventory_and_purchases.sql'];
     
     for (const migration of migrations) {
       const migrationPath = path.join(__dirname, 'migrations', migration);
@@ -227,6 +227,72 @@ const resetConversation = async (whatsappNumber) => {
   );
 };
 
+// PRODUCT FUNCTIONS
+const getProducts = async (userId) => {
+  return dbQuery(
+    `SELECT id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice", created_at as "createdAt", updated_at as "updatedAt" FROM products WHERE user_id = $1 ORDER BY name ASC`,
+    [userId]
+  );
+};
+
+const getProductById = async (productId) => {
+  return dbQuerySingle(
+    `SELECT id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice", created_at as "createdAt", updated_at as "updatedAt" FROM products WHERE id = $1`,
+    [productId]
+  );
+};
+
+const getProductByName = async (userId, name) => {
+  return dbQuerySingle(
+    `SELECT id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice" FROM products WHERE user_id = $1 AND LOWER(name) = LOWER($2)`,
+    [userId, name]
+  );
+};
+
+const createProduct = async (productData) => {
+  const { id, userId, name, sku, stockQty = 0, avgCost = 0, sellingPrice = 0 } = productData;
+  const result = await pool.query(
+    `INSERT INTO products (id, user_id, name, sku, stock_qty, avg_cost, selling_price, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+     RETURNING id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice"`,
+    [id, userId, name, sku || null, stockQty, avgCost, sellingPrice]
+  );
+  return result.rows[0];
+};
+
+const updateProductStock = async (productId, qtyChange, newAvgCost = null) => {
+  if (newAvgCost !== null) {
+    await dbExecute(
+      `UPDATE products SET stock_qty = stock_qty + $1, avg_cost = $2, updated_at = NOW() WHERE id = $3`,
+      [qtyChange, newAvgCost, productId]
+    );
+  } else {
+    await dbExecute(
+      `UPDATE products SET stock_qty = stock_qty + $1, updated_at = NOW() WHERE id = $2`,
+      [qtyChange, productId]
+    );
+  }
+};
+
+// PURCHASE FUNCTIONS
+const createPurchaseInvoice = async (purchaseData) => {
+  const { id, userId, supplierName, supplierGst, invoiceNumber, invoiceDate, total, subtotal, gstAmount, status, items, pdfUrl } = purchaseData;
+  const result = await pool.query(
+    `INSERT INTO purchase_invoices (id, user_id, supplier_name, supplier_gst, invoice_number, invoice_date, total, subtotal, gst_amount, status, items, pdf_url, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, NOW(), NOW())
+     RETURNING id, user_id as "userId", supplier_name as "supplierName", supplier_gst as "supplierGst", invoice_number as "invoiceNumber", invoice_date as "invoiceDate", total, subtotal, gst_amount as "gstAmount", status, items, pdf_url as "pdfUrl", created_at as "createdAt"`,
+    [id, userId, supplierName, supplierGst || null, invoiceNumber, invoiceDate || null, total, subtotal, gstAmount, status || 'Verified', JSON.stringify(items || []), pdfUrl || null]
+  );
+  return result.rows[0];
+};
+
+const getPurchases = async (userId) => {
+  return dbQuery(
+    `SELECT id, user_id as "userId", supplier_name as "supplierName", supplier_gst as "supplierGst", invoice_number as "invoiceNumber", invoice_date as "invoiceDate", total, subtotal, gst_amount as "gstAmount", status, items, pdf_url as "pdfUrl", created_at as "createdAt" FROM purchase_invoices WHERE user_id = $1 ORDER BY created_at DESC`,
+    [userId]
+  );
+};
+
 module.exports = {
   pool,
   initializeDatabase,
@@ -251,4 +317,11 @@ module.exports = {
   updateConversationState,
   updateConversationData,
   resetConversation,
+  getProducts,
+  getProductById,
+  getProductByName,
+  createProduct,
+  updateProductStock,
+  createPurchaseInvoice,
+  getPurchases,
 };

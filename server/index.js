@@ -7,6 +7,8 @@ const invoiceRoutes = require('./routes/invoices');
 const userRoutes = require('./routes/users');
 const telegramRoutes = require('./routes/telegram');
 const paymentRoutes = require('./routes/payments');
+const productRoutes = require('./routes/products');
+const purchaseRoutes = require('./routes/purchases');
 
 // PostgreSQL initialization (optional - disabled by default)
 if (process.env.USE_POSTGRES === 'true' && (process.env.DATABASE_URL || process.env.DB_HOST)) {
@@ -71,6 +73,8 @@ app.use('/api/invoices', invoiceRoutes); // Authenticated routes
 app.use('/api/users', userRoutes);
 app.use('/api/telegram', telegramRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/purchases', purchaseRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

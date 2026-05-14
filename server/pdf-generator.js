@@ -409,15 +409,14 @@ const generateModernPDF = (doc, invoice, user) => {
 
   // Bill To Details
   const gridY6 = gridY5 + 15;
-  drawLine(colMid, gridY6, colMid, gridY6 + 60); // middle line for bill/ship block
   
-  doc.font('Helvetica-Bold').fontSize(11).text((invoice.clientName || '').toUpperCase(), 52, gridY6 + 4, { width: 240 });
-  doc.font('Helvetica-Bold').fontSize(11).text((invoice.clientName || '').toUpperCase(), colMid + 2, gridY6 + 4, { width: 240 });
+  doc.font('Helvetica-Bold').fontSize(11).text((invoice.clientName || '').toUpperCase(), 52, gridY6 + 4, { width: 240, height: 14 });
+  doc.font('Helvetica-Bold').fontSize(11).text((invoice.clientName || '').toUpperCase(), colMid + 2, gridY6 + 4, { width: 240, height: 14 });
   
   const gridY7 = gridY6 + 20;
   drawLine(50, gridY7, 545, gridY7);
-  doc.font('Helvetica-Bold').fontSize(8).text('ADDRESS : ', 52, gridY7 + 4, { continued: true }).font('Helvetica').text((invoice.clientAddress || '').toUpperCase(), { width: 240 });
-  doc.font('Helvetica-Bold').fontSize(8).text('ADDRESS : ', colMid + 2, gridY7 + 4, { continued: true }).font('Helvetica').text((invoice.clientAddress || '').toUpperCase(), { width: 240 });
+  doc.font('Helvetica-Bold').fontSize(8).text('ADDRESS : ', 52, gridY7 + 4, { width: 240, height: 22, continued: true }).font('Helvetica').text((invoice.clientAddress || '').toUpperCase());
+  doc.font('Helvetica-Bold').fontSize(8).text('ADDRESS : ', colMid + 2, gridY7 + 4, { width: 240, height: 22, continued: true }).font('Helvetica').text((invoice.clientAddress || '').toUpperCase());
 
   const gridY8 = gridY7 + 25;
   drawLine(50, gridY8, 545, gridY8);
@@ -426,13 +425,15 @@ const generateModernPDF = (doc, invoice, user) => {
 
   const gridY9 = gridY8 + 15;
   drawLine(50, gridY9, 545, gridY9);
-  doc.font('Helvetica-Bold').text(`State: ${invoice.clientState || ''}`.toUpperCase(), 52, gridY9 + 4, { width: 190 });
+  doc.font('Helvetica-Bold').text(`State: ${invoice.clientState || ''}`.toUpperCase(), 52, gridY9 + 4, { width: 190, height: 12 });
   drawLine(245, gridY9, 245, gridY9 + 15);
-  doc.font('Helvetica-Bold').text(`Code   ${invoice.clientStateCode || ''}`, 247, gridY9 + 4);
+  doc.font('Helvetica-Bold').text(`Code   ${invoice.clientStateCode || ''}`, 247, gridY9 + 4, { width: 48, height: 12 });
   
-  doc.font('Helvetica-Bold').text(`State: ${invoice.clientState || ''}`.toUpperCase(), colMid + 2, gridY9 + 4, { width: 190 });
+  doc.font('Helvetica-Bold').text(`State: ${invoice.clientState || ''}`.toUpperCase(), colMid + 2, gridY9 + 4, { width: 190, height: 12 });
   drawLine(colMid + 195, gridY9, colMid + 195, gridY9 + 15);
-  doc.font('Helvetica-Bold').text(`Code   ${invoice.clientStateCode || ''}`, colMid + 197, gridY9 + 4);
+  doc.font('Helvetica-Bold').text(`Code   ${invoice.clientStateCode || ''}`, colMid + 197, gridY9 + 4, { width: 48, height: 12 });
+
+  drawLine(colMid, gridY6, colMid, gridY9 + 15); // middle line for the entire bill/ship block
 
   // Items Table Header
   const tableY = gridY9 + 15;
