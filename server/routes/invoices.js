@@ -107,6 +107,7 @@ router.get('/', async (req, res) => {
 
 // POST /api/invoices - create new invoice
 router.post('/', async (req, res) => {
+  try {
   let user = null;
   if (process.env.USE_POSTGRES === 'true') {
     const pgFunctions = require('../db-postgres');
@@ -304,6 +305,10 @@ router.post('/', async (req, res) => {
   }
 
   res.status(201).json({ invoice, message: 'Invoice created successfully' });
+  } catch (err) {
+    console.error('POST /api/invoices error:', err);
+    res.status(500).json({ error: err.message || 'Internal server error while creating invoice' });
+  }
 });
 
 // PATCH /api/invoices/:id/status - update payment status
