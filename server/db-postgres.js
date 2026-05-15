@@ -180,12 +180,20 @@ const deleteInvoice = async (invoiceId) => {
 };
 
 const getNextInvoiceNumber = async (userId) => {
+  // Use MAX to find the highest existing invoice number, not COUNT
+  // This prevents collisions when invoices have been deleted
   const result = await dbQuerySingle(
-    `SELECT COUNT(*) as count FROM invoices WHERE user_id = $1`,
+    `SELECT invoice_number FROM invoices WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
     [userId]
   );
-  const count = result ? parseInt(result.count) + 1 : 1;
-  return `INV-${String(count).padStart(3, '0')}`;
+  let nextNum = 1;
+  if (result && result.invoice_number) {
+    const match = result.invoice_number.match(/INV-(\d+)/);
+    if (match) {
+      nextNum = parseInt(match[1], 10) + 1;
+    }
+  }
+  return `INV-${String(nextNum).padStart(3, '0')}`;
 };
 
 // CONVERSATION FUNCTIONS
