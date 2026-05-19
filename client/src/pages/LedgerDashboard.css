@@ -317,7 +317,7 @@
 /* ── DIVIDER ── */
 .divider { height: 1px; background: var(--border2); margin: 4px 0 12px; }
 /* ── MOBILE ELEMENTS (HIDDEN ON DESKTOP) ── */
-.hamburger-btn, .sidebar-close-btn, .sidebar-backdrop {
+.hamburger-btn, .sidebar-close-btn, .sidebar-backdrop, .bottom-nav {
   display: none;
 }
 
@@ -327,32 +327,56 @@
     position: relative;
   }
   .sidebar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100vh;
-    transform: translateX(-100%);
-    transition: transform 0.3s ease;
-    z-index: 100;
-  }
-  .sidebar.open {
-    transform: translateX(0);
-    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    display: none !important;
   }
   .sidebar-backdrop {
-    display: none;
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0,0,0,0.4);
-    z-index: 90;
-    opacity: 0;
-    transition: opacity 0.3s ease;
+    display: none !important;
   }
-  .sidebar-backdrop.open {
-    display: block;
+  
+  .layout {
+    padding-bottom: 60px; /* Space for bottom nav */
+  }
+
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 60px;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    z-index: 100;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0 10px;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+  }
+
+  .bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: var(--ink3);
+    font-size: 10px;
+    font-weight: 500;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    flex: 1;
+    height: 100%;
+  }
+
+  .bottom-nav-item.active {
+    color: var(--green);
+  }
+
+  .bottom-nav-item svg {
+    opacity: 0.8;
+  }
+  .bottom-nav-item.active svg {
     opacity: 1;
   }
   
@@ -366,9 +390,8 @@
   .topbar-search {
     display: none; /* Hide search bar on mobile to save space */
   }
-  .btn-create-mobile {
-    padding: 8px 10px;
-    font-size: 12px;
+  #btn-create-mobile {
+    display: none;
   }
   
   .content {
@@ -401,29 +424,8 @@
     align-items: flex-start;
   }
   
-  .hamburger-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    color: var(--ink);
-    padding: 4px;
-    margin-right: 4px;
-  }
-  
-  .sidebar-close-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    color: white;
-    cursor: pointer;
-    position: absolute;
-    top: 20px;
-    right: 16px;
+  .hamburger-btn, .sidebar-close-btn {
+    display: none !important;
   }
 }
 

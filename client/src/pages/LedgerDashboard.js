@@ -84,6 +84,35 @@ function Sidebar({ screen, setScreen, user, logout, isSidebarOpen, setIsSidebarO
   );
 }
 
+function BottomNav({ screen, setScreen, setShowCreate }) {
+  const nav = [
+    { icon: LayoutDashboard, label: "Home", s: 0 },
+    { icon: FileText, label: "Docs", s: 1 },
+    { icon: Plus, label: "Create", action: 'create' },
+    { icon: BarChart2, label: "Stats", s: 4 },
+    { icon: Settings, label: "Settings", s: 5 },
+  ];
+
+  return (
+    <nav className="bottom-nav">
+      {nav.map((item) => {
+        const Icon = item.icon;
+        const isActive = screen === item.s;
+        return (
+          <button 
+            key={item.label} 
+            onClick={() => item.action === 'create' ? setShowCreate(true) : setScreen(item.s)}
+            className={`bottom-nav-item ${isActive ? 'active' : ''}`}
+          >
+            <Icon size={20} />
+            <span>{item.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 function Dashboard({ setScreen, user, stats, monthData, recentInvoices }) {
   const sortedMonthData = useMemo(() => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -907,20 +936,16 @@ export default function LedgerDashboard() {
   return (
     <div className="ledger-dashboard-wrapper">
       <div className="layout">
-        <div className={`sidebar-backdrop ${isSidebarOpen ? 'open' : ''}`} onClick={() => setIsSidebarOpen(false)}></div>
-        <Sidebar screen={screen} setScreen={(s) => { setScreen(s); setIsSidebarOpen(false); }} user={user} logout={logout} isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
+        <Sidebar screen={screen} setScreen={setScreen} user={user} logout={logout} />
         
         <main className="main">
           <div className="topbar">
-            <button className="hamburger-btn" onClick={() => setIsSidebarOpen(true)}>
-              <Menu size={20} />
-            </button>
             <div className="topbar-title">{screenTitles[screen] || "Dashboard"}</div>
             <div className="topbar-search">
               <Search size={14} color="#9ca3af" />
               <input placeholder="Search invoices, products…" />
             </div>
-            <button className="btn btn-terra" onClick={() => setShowCreate(true)}>
+            <button className="btn btn-terra" id="btn-create-mobile" onClick={() => setShowCreate(true)}>
               <Plus size={13} /> Create Invoice
             </button>
           </div>
@@ -935,6 +960,7 @@ export default function LedgerDashboard() {
           </div>
         </main>
         
+        <BottomNav screen={screen} setScreen={setScreen} setShowCreate={setShowCreate} />
         {showCreate && <CreateInvoiceModal onClose={() => setShowCreate(false)} onSuccess={() => { fetchInvoices(); fetchProducts(); }} user={user} />}
       </div>
     </div>
