@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import {
   LayoutDashboard, FileText, Upload, Package, BarChart2,
   TrendingUp, TrendingDown, Plus, Eye, ChevronRight,
-  ChevronLeft, CheckCircle, AlertCircle, Database, Settings, LogOut, Trash2, Search
+  ChevronLeft, CheckCircle, AlertCircle, Database, Settings, LogOut, Trash2, Search, Menu, X
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
@@ -16,7 +16,7 @@ import "./LedgerDashboard.css";
 const T = "#0F6E56";
 const TL = "#E1F5EE";
 
-function Sidebar({ screen, setScreen, user, logout }) {
+function Sidebar({ screen, setScreen, user, logout, isSidebarOpen, setIsSidebarOpen }) {
   const nav = [
     { icon: LayoutDashboard, label: "Dashboard", s: 0 },
     { icon: BarChart2, label: "Analytics", s: 4 },
@@ -29,7 +29,10 @@ function Sidebar({ screen, setScreen, user, logout }) {
   ];
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
+      <button className="sidebar-close-btn" onClick={() => setIsSidebarOpen(false)}>
+        <X size={20} />
+      </button>
       <div className="sidebar-logo">
         <div className="wordmark">InvoiceEase</div>
         <div className="sub">Business Manager</div>
@@ -781,6 +784,7 @@ export default function LedgerDashboard() {
   const { user, logout, authFetch, setUser } = useAuth();
   const [screen, setScreen] = useState(0);
   const [showCreate, setShowCreate] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(null);
 
   const [invoices, setInvoices] = useState([]);
@@ -903,10 +907,14 @@ export default function LedgerDashboard() {
   return (
     <div className="ledger-dashboard-wrapper">
       <div className="layout">
-        <Sidebar screen={screen} setScreen={setScreen} user={user} logout={logout} />
+        <div className={`sidebar-backdrop ${isSidebarOpen ? 'open' : ''}`} onClick={() => setIsSidebarOpen(false)}></div>
+        <Sidebar screen={screen} setScreen={(s) => { setScreen(s); setIsSidebarOpen(false); }} user={user} logout={logout} isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
         
         <main className="main">
           <div className="topbar">
+            <button className="hamburger-btn" onClick={() => setIsSidebarOpen(true)}>
+              <Menu size={20} />
+            </button>
             <div className="topbar-title">{screenTitles[screen] || "Dashboard"}</div>
             <div className="topbar-search">
               <Search size={14} color="#9ca3af" />
