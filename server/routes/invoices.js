@@ -21,7 +21,7 @@ publicRouter.get('/pdf/:id', async (req, res) => {
 
   const fs = require('fs');
   const path = require('path');
-  const pdfPath = path.join(__dirname, '..', 'pdfs', `${invoice.invoiceNumber}.pdf`);
+  const pdfPath = path.join(__dirname, '..', 'pdfs', `${invoice.id}.pdf`);
 
   if (!fs.existsSync(pdfPath)) {
     return res.status(404).json({ error: 'PDF not found. Please regenerate the invoice.' });
@@ -121,7 +121,7 @@ router.post('/', async (req, res) => {
     return res.status(403).json({ error: 'Free plan limit reached (5 invoices/month). Please upgrade.' });
   }
 
-  const { clientName, clientGst, clientAddress, clientMobile, clientState, clientStateCode, reverseCharge, transportMode, vehicleNumber, dateOfSupply, placeOfSupply, service, amount, items, gstRate = 18, notes, dueDate, templateStyle } = req.body;
+  const { docType = 'sales_invoice', clientName, clientGst, clientAddress, clientMobile, clientState, clientStateCode, reverseCharge, transportMode, vehicleNumber, dateOfSupply, placeOfSupply, service, amount, items, gstRate = 18, notes, dueDate, templateStyle } = req.body;
   if (!clientName) {
     return res.status(400).json({ error: 'Client name is required' });
   }
@@ -134,6 +134,8 @@ router.post('/', async (req, res) => {
       const description = String(item.description || '').trim();
       const quantity = Number(item.quantity);
       const unitPrice = Number(item.unitPrice);
+      const discount = Number(item.discount) || 0;
+      const discountType = item.discountType || '₹';
       let productId = null;
 
       if (process.env.USE_POSTGRES === 'true') {
@@ -153,9 +155,21 @@ router.post('/', async (req, res) => {
         }
         productId = product.id;
         
-        // Decrease stock
-        await pgFunctions.updateProductStock(productId, -quantity);
+        // Update stock based on docType
+        if (['sales_invoice', 'delivery_challan'].includes(docType)) {
+          await pgFunctions.updateProductStock(productId, -quantity);
+        } else if (docType === 'credit_note') {
+          await pgFunctions.updateProductStock(productId, quantity);
+        }
       }
+
+      let lineTotal = quantity * unitPrice;
+      if (discountType === '%') {
+        lineTotal -= lineTotal * (discount / 100);
+      } else {
+        lineTotal -= discount;
+      }
+      lineTotal = Math.max(0, lineTotal);
 
       return {
         productId,
@@ -164,7 +178,9 @@ router.post('/', async (req, res) => {
         uom: String(item.uom || 'PCS.').trim(),
         quantity,
         unitPrice,
-        amount: Number((quantity * unitPrice).toFixed(2)),
+        discount,
+        discountType,
+        amount: Number(lineTotal.toFixed(2)),
       };
     }));
   }
@@ -218,7 +234,7 @@ router.post('/', async (req, res) => {
   let invoiceNumber;
   if (process.env.USE_POSTGRES === 'true') {
     const pgFunctions = require('../db-postgres');
-    invoiceNumber = await pgFunctions.getNextInvoiceNumber(req.userId);
+    invoiceNumber = await pgFunctions.getNextDocNumber(req.userId, docType);
   } else {
     const userInvoices = db.invoices.filter(inv => inv.userId === req.userId);
     const invoiceNum = userInvoices.length + 1;
@@ -238,6 +254,7 @@ router.post('/', async (req, res) => {
   const invoice = {
     id: uuidv4(),
     userId: req.userId,
+    docType,
     invoiceNumber,
     clientName,
     clientGst: user.gstNumber ? clientGst : '',
@@ -364,7 +381,7 @@ publicRouter.get('/:id/pdf', async (req, res) => {
 
   const fs = require('fs');
   const path = require('path');
-  const pdfPath = path.join(__dirname, '..', 'pdfs', `${invoice.invoiceNumber}.pdf`);
+  const pdfPath = path.join(__dirname, '..', 'pdfs', `${invoice.id}.pdf`);
 
   if (!fs.existsSync(pdfPath)) {
     return res.status(404).json({ error: 'PDF not found. Please regenerate the invoice.' });

@@ -20,27 +20,67 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/purchases/extract (MOCK OCR)
+// POST /api/purchases/extract (Gemini Vision OCR)
 router.post('/extract', async (req, res) => {
-  // Mock OCR logic to return realistic data
-  setTimeout(() => {
-    res.json({
-      data: {
-        supplier: "Metro Wholesale Hub Pvt. Ltd.",
-        invoiceNo: "MWH/2026/04821",
-        date: "2026-05-12",
-        gst: "22AAAAA0000A1Z5",
-        items: [
-          { name: "Nike Air Max 90", qty: 24, unit: 2100, total: 50400, conf: 0.98 },
-          { name: "Adidas Superstar", qty: 12, unit: 1800, total: 21600, conf: 0.95 },
-          { name: "Puma RS-X", qty: 18, unit: 1650, total: 29700, conf: 0.91 },
+  try {
+    const { image, mimeType } = req.body;
+    
+    if (!image) {
+      return res.status(400).json({ error: 'No image provided' });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ error: 'GEMINI_API_KEY is not configured' });
+    }
+
+    const { GoogleGenerativeAI } = require("@google/generative-ai");
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    // Use gemini-2.5-pro for high accuracy vision tasks
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+
+    const prompt = `
+      You are an expert OCR and data extraction tool. Extract the following details from this purchase invoice.
+      Return ONLY a valid JSON object with the exact keys:
+      {
+        "supplier": "Full name of the supplier/vendor",
+        "invoiceNo": "Invoice number or bill number",
+        "date": "Invoice date in YYYY-MM-DD format",
+        "gst": "Supplier's GSTIN if available",
+        "items": [
+          { "name": "Item description", "qty": Number, "unit": Number (Unit Price), "total": Number (Line total) }
         ],
-        subtotal: 101700,
-        gstAmt: 18306,
-        total: 120006,
+        "subtotal": Number (total before taxes),
+        "gstAmt": Number (total tax amount),
+        "total": Number (grand total)
       }
-    });
-  }, 1500); // 1.5 second delay to simulate AI processing
+      If any field is missing or unreadable, put null for strings or 0 for numbers.
+      Do not include any markdown formatting like \`\`\`json. Return just the raw JSON object.
+    `;
+
+    // Strip out the data URL prefix if it exists (handles both image/ and application/pdf)
+    const base64Data = image.replace(/^data:.*?;base64,/, "");
+
+    const imagePart = {
+      inlineData: {
+        data: base64Data,
+        mimeType: mimeType || "image/jpeg"
+      }
+    };
+
+    const result = await model.generateContent([prompt, imagePart]);
+    const response = await result.response;
+    let text = response.text();
+    
+    // Clean up potential markdown formatting from the response
+    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+    const extractedData = JSON.parse(text);
+
+    res.json({ data: extractedData });
+  } catch (error) {
+    console.error('Error extracting invoice data:', error);
+    res.status(500).json({ error: 'Failed to extract invoice data. The image might be unreadable.' });
+  }
 });
 
 // POST /api/purchases

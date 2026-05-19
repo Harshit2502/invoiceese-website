@@ -120,80 +120,185 @@ const updateUserPassword = async (userId, newPasswordHash) => {
     [newPasswordHash, userId]
   );
   return result.rows[0];
-};
-
-// INVOICE FUNCTIONS
-const createInvoice = async (invoiceData) => {
-  const { id, userId, invoiceNumber, clientName, clientGst, clientAddress, clientMobile, clientState, clientStateCode, reverseCharge, transportMode, vehicleNumber, dateOfSupply, placeOfSupply, service, items, amount, gstRate, gstAmount, cgst, sgst, igst, gstType, totalAmount, notes, dueDate, pdfUrl, status, date } = invoiceData;
-  
+// DOCUMENT FUNCTIONS
+const createDocument = async (docData) => {
+  const { id, userId, docType, direction, parentDocumentId, docNumber, partyName, partyGst, partyAddress, partyMobile, partyState, partyStateCode, reverseCharge, transportMode, vehicleNumber, dateOfSupply, placeOfSupply, items, subtotal, gstRate, gstAmount, cgst, sgst, igst, gstType, total, serviceDescription, notes, dueDate, docDate, paymentDetails, pdfUrl, status, templateStyle, showWatermark } = docData;
   const itemsJson = items ? JSON.stringify(items) : '[]';
-  
+  const paymentDetailsJson = paymentDetails ? JSON.stringify(paymentDetails) : null;
   const result = await pool.query(
-    `INSERT INTO invoices (id, user_id, invoice_number, client_name, client_gst, client_address, client_mobile, client_state, client_state_code, reverse_charge, transport_mode, vehicle_number, date_of_supply, place_of_supply, service_description, items, subtotal, gst_rate, gst_amount, cgst, sgst, igst, total, gst_type, notes, due_date, pdf_url, status, invoice_date, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, NOW(), NOW())
+    `INSERT INTO documents (id, user_id, doc_type, direction, parent_document_id, doc_number, party_name, party_gst, party_address, party_mobile, party_state, party_state_code, reverse_charge, transport_mode, vehicle_number, date_of_supply, place_of_supply, items, subtotal, gst_rate, gst_amount, cgst, sgst, igst, gst_type, total, service_description, notes, due_date, doc_date, payment_details, pdf_url, status, template_style, show_watermark, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31::jsonb, $32, $33, $34, $35, NOW(), NOW())
      RETURNING *`,
-    [id, userId, invoiceNumber, clientName, clientGst, clientAddress || null, clientMobile || null, clientState || null, clientStateCode || null, reverseCharge || false, transportMode || null, vehicleNumber || null, dateOfSupply || null, placeOfSupply || null, service, itemsJson, amount, gstRate, gstAmount, cgst !== undefined ? cgst : gstAmount/2, sgst !== undefined ? sgst : gstAmount/2, igst || 0, totalAmount, gstType || 'intrastate', notes || '', dueDate || null, pdfUrl || null, status, date]
+    [id, userId, docType, direction, parentDocumentId || null, docNumber, partyName, partyGst || null, partyAddress || null, partyMobile || null, partyState || null, partyStateCode || null, reverseCharge || false, transportMode || null, vehicleNumber || null, dateOfSupply || null, placeOfSupply || null, itemsJson, subtotal || 0, gstRate || 0, gstAmount || 0, cgst || 0, sgst || 0, igst || 0, gstType || 'intrastate', total, serviceDescription || null, notes || null, dueDate || null, docDate || null, paymentDetailsJson, pdfUrl || null, status || 'draft', templateStyle || 'modern', showWatermark === undefined ? true : showWatermark]
   );
   return result.rows[0];
 };
 
-const getInvoiceById = async (invoiceId) => {
-  return dbQuerySingle(
-    `SELECT id, user_id as "userId", invoice_number as "invoiceNumber", client_name as "clientName", client_gst as "clientGst", client_address as "clientAddress", client_mobile as "clientMobile", client_state as "clientState", client_state_code as "clientStateCode", reverse_charge as "reverseCharge", transport_mode as "transportMode", vehicle_number as "vehicleNumber", date_of_supply as "dateOfSupply", place_of_supply as "placeOfSupply", service_description as "service", items, subtotal as "amount", gst_rate as "gstRate", gst_amount as "gstAmount", cgst, sgst, igst, total as "totalAmount", gst_type as "gstType", pdf_url as "pdfUrl", notes, due_date as "dueDate", payment_details as "payment", status, invoice_date as "date", created_at as "createdAt" FROM invoices WHERE id = $1`,
-    [invoiceId]
-  );
+const getDocumentById = async (id) => {
+  return dbQuerySingle(`SELECT * FROM documents WHERE id = $1`, [id]);
 };
 
-const getUserInvoices = async (userId) => {
-  return dbQuery(
-    `SELECT id, user_id as "userId", invoice_number as "invoiceNumber", client_name as "clientName", client_gst as "clientGst", client_address as "clientAddress", client_mobile as "clientMobile", client_state as "clientState", client_state_code as "clientStateCode", reverse_charge as "reverseCharge", transport_mode as "transportMode", vehicle_number as "vehicleNumber", date_of_supply as "dateOfSupply", place_of_supply as "placeOfSupply", service_description as "service", items, subtotal as "amount", gst_rate as "gstRate", gst_amount as "gstAmount", cgst, sgst, igst, total as "totalAmount", gst_type as "gstType", pdf_url as "pdfUrl", notes, due_date as "dueDate", payment_details as "payment", status, invoice_date as "date", created_at as "createdAt" FROM invoices WHERE user_id = $1 ORDER BY created_at DESC`,
-    [userId]
-  );
+const getUserDocuments = async (userId, docType) => {
+  if (docType) {
+    return dbQuery(`SELECT * FROM documents WHERE user_id = $1 AND doc_type = $2 ORDER BY created_at DESC`, [userId, docType]);
+  }
+  return dbQuery(`SELECT * FROM documents WHERE user_id = $1 ORDER BY created_at DESC`, [userId]);
 };
 
-const updateInvoiceStatus = async (invoiceId, status, paymentDetails = null) => {
+const updateDocumentStatus = async (id, status, paymentDetails = null) => {
   if (paymentDetails) {
     const result = await pool.query(
-      `UPDATE invoices SET status = $1, payment_details = $2::jsonb, updated_at = NOW() WHERE id = $3 RETURNING *`,
-      [status, JSON.stringify(paymentDetails), invoiceId]
+      `UPDATE documents SET status = $1, payment_details = $2::jsonb, updated_at = NOW() WHERE id = $3 RETURNING *`,
+      [status, JSON.stringify(paymentDetails), id]
     );
     return result.rows[0];
   } else {
     const result = await pool.query(
-      `UPDATE invoices SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
-      [status, invoiceId]
+      `UPDATE documents SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+      [status, id]
     );
     return result.rows[0];
   }
 };
 
-const updateInvoicePdfUrl = async (invoiceId, pdfUrl) => {
-  const result = await pool.query(
-    `UPDATE invoices SET pdf_url = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
-    [pdfUrl, invoiceId]
-  );
+const updateDocumentPdfUrl = async (id, pdfUrl) => {
+  const result = await pool.query(`UPDATE documents SET pdf_url = $1, updated_at = NOW() WHERE id = $2 RETURNING *`, [pdfUrl, id]);
   return result.rows[0];
 };
 
-const deleteInvoice = async (invoiceId) => {
-  return dbExecute(`DELETE FROM invoices WHERE id = $1`, [invoiceId]);
+const deleteDocument = async (id) => {
+  return dbExecute(`DELETE FROM documents WHERE id = $1`, [id]);
 };
 
-const getNextInvoiceNumber = async (userId) => {
-  // Use MAX to find the highest existing invoice number, not COUNT
-  // This prevents collisions when invoices have been deleted
+const getNextDocNumber = async (userId, docType) => {
   const result = await dbQuerySingle(
-    `SELECT invoice_number FROM invoices WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
-    [userId]
+    `SELECT doc_number FROM documents WHERE user_id = $1 AND doc_type = $2 ORDER BY created_at DESC LIMIT 1`,
+    [userId, docType]
   );
   let nextNum = 1;
-  if (result && result.invoice_number) {
-    const match = result.invoice_number.match(/INV-(\d+)/);
+  const prefixMap = { 
+    'sales_invoice': 'INV-', 
+    'purchase_invoice': 'PI-', 
+    'credit_note': 'CN-',
+    'debit_note': 'DN-',
+    'provisional_invoice': 'PROV-',
+    'delivery_challan': 'DC-'
+  };
+  const prefix = prefixMap[docType] || 'DOC-';
+  if (result && result.doc_number) {
+    const match = result.doc_number.match(new RegExp(`^${prefix}(\\d+)`));
     if (match) {
       nextNum = parseInt(match[1], 10) + 1;
     }
   }
-  return `INV-${String(nextNum).padStart(3, '0')}`;
+  return `${prefix}${String(nextNum).padStart(3, '0')}`;
+};
+
+// LEGACY INVOICE WRAPPERS (To maintain API compatibility during transition)
+const mapDocToInvoice = (doc) => {
+  if (!doc) return null;
+  return {
+    id: doc.id,
+    userId: doc.user_id,
+    invoiceNumber: doc.doc_number,
+    docType: doc.doc_type,
+    clientName: doc.party_name,
+    clientGst: doc.party_gst,
+    clientAddress: doc.party_address,
+    clientMobile: doc.party_mobile,
+    clientState: doc.party_state,
+    clientStateCode: doc.party_state_code,
+    reverseCharge: doc.reverse_charge,
+    transportMode: doc.transport_mode,
+    vehicleNumber: doc.vehicle_number,
+    dateOfSupply: doc.date_of_supply,
+    placeOfSupply: doc.place_of_supply,
+    service: doc.service_description,
+    items: doc.items,
+    amount: doc.subtotal,
+    gstRate: doc.gst_rate,
+    gstAmount: doc.gst_amount,
+    cgst: doc.cgst,
+    sgst: doc.sgst,
+    igst: doc.igst,
+    totalAmount: doc.total,
+    gstType: doc.gst_type,
+    notes: doc.notes,
+    dueDate: doc.due_date,
+    payment: doc.payment_details,
+    pdfUrl: doc.pdf_url,
+    status: doc.status,
+    date: doc.doc_date,
+    createdAt: doc.created_at
+  };
+};
+
+const createInvoice = async (invoiceData) => {
+  const docData = {
+    id: invoiceData.id,
+    userId: invoiceData.userId,
+    docType: invoiceData.docType || 'sales_invoice',
+    direction: 'outbound',
+    docNumber: invoiceData.invoiceNumber,
+    partyName: invoiceData.clientName,
+    partyGst: invoiceData.clientGst,
+    partyAddress: invoiceData.clientAddress,
+    partyMobile: invoiceData.clientMobile,
+    partyState: invoiceData.clientState,
+    partyStateCode: invoiceData.clientStateCode,
+    reverseCharge: invoiceData.reverseCharge,
+    transportMode: invoiceData.transportMode,
+    vehicleNumber: invoiceData.vehicleNumber,
+    dateOfSupply: invoiceData.dateOfSupply,
+    placeOfSupply: invoiceData.placeOfSupply,
+    serviceDescription: invoiceData.service,
+    items: invoiceData.items,
+    subtotal: invoiceData.amount,
+    gstRate: invoiceData.gstRate,
+    gstAmount: invoiceData.gstAmount,
+    cgst: invoiceData.cgst !== undefined ? invoiceData.cgst : invoiceData.gstAmount/2,
+    sgst: invoiceData.sgst !== undefined ? invoiceData.sgst : invoiceData.gstAmount/2,
+    igst: invoiceData.igst || 0,
+    gstType: invoiceData.gstType || 'intrastate',
+    total: invoiceData.totalAmount,
+    notes: invoiceData.notes,
+    dueDate: invoiceData.dueDate,
+    docDate: invoiceData.date,
+    pdfUrl: invoiceData.pdfUrl,
+    status: invoiceData.status || 'unpaid',
+    paymentDetails: invoiceData.paymentDetails
+  };
+  const doc = await createDocument(docData);
+  return mapDocToInvoice(doc);
+};
+
+const getInvoiceById = async (invoiceId) => {
+  const doc = await getDocumentById(invoiceId);
+  return mapDocToInvoice(doc);
+};
+
+const getUserInvoices = async (userId) => {
+  const docs = await getUserDocuments(userId, 'sales_invoice');
+  return docs.map(mapDocToInvoice);
+};
+
+const updateInvoiceStatus = async (invoiceId, status, paymentDetails = null) => {
+  const doc = await updateDocumentStatus(invoiceId, status, paymentDetails);
+  return mapDocToInvoice(doc);
+};
+
+const updateInvoicePdfUrl = async (invoiceId, pdfUrl) => {
+  const doc = await updateDocumentPdfUrl(invoiceId, pdfUrl);
+  return mapDocToInvoice(doc);
+};
+
+const deleteInvoice = async (invoiceId) => {
+  return deleteDocument(invoiceId);
+};
+
+const getNextInvoiceNumber = async (userId) => {
+  return getNextDocNumber(userId, 'sales_invoice');
+};`;
 };
 
 // CONVERSATION FUNCTIONS
@@ -282,23 +387,50 @@ const updateProductStock = async (productId, qtyChange, newAvgCost = null) => {
   }
 };
 
-// PURCHASE FUNCTIONS
+// PURCHASE FUNCTIONS WRAPPERS
+const mapDocToPurchase = (doc) => {
+  if (!doc) return null;
+  return {
+    id: doc.id,
+    userId: doc.user_id,
+    supplierName: doc.party_name,
+    supplierGst: doc.party_gst,
+    invoiceNumber: doc.doc_number,
+    invoiceDate: doc.doc_date,
+    total: doc.total,
+    subtotal: doc.subtotal,
+    gstAmount: doc.gst_amount,
+    status: doc.status,
+    items: doc.items,
+    pdfUrl: doc.pdf_url,
+    createdAt: doc.created_at
+  };
+};
+
 const createPurchaseInvoice = async (purchaseData) => {
-  const { id, userId, supplierName, supplierGst, invoiceNumber, invoiceDate, total, subtotal, gstAmount, status, items, pdfUrl } = purchaseData;
-  const result = await pool.query(
-    `INSERT INTO purchase_invoices (id, user_id, supplier_name, supplier_gst, invoice_number, invoice_date, total, subtotal, gst_amount, status, items, pdf_url, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, NOW(), NOW())
-     RETURNING id, user_id as "userId", supplier_name as "supplierName", supplier_gst as "supplierGst", invoice_number as "invoiceNumber", invoice_date as "invoiceDate", total, subtotal, gst_amount as "gstAmount", status, items, pdf_url as "pdfUrl", created_at as "createdAt"`,
-    [id, userId, supplierName, supplierGst || null, invoiceNumber, invoiceDate || null, total, subtotal, gstAmount, status || 'Verified', JSON.stringify(items || []), pdfUrl || null]
-  );
-  return result.rows[0];
+  const docData = {
+    id: purchaseData.id,
+    userId: purchaseData.userId,
+    docType: 'purchase_invoice',
+    direction: 'inbound',
+    docNumber: purchaseData.invoiceNumber || \`PI-\${Date.now()}\`,
+    partyName: purchaseData.supplierName,
+    partyGst: purchaseData.supplierGst,
+    docDate: purchaseData.invoiceDate,
+    total: purchaseData.total,
+    subtotal: purchaseData.subtotal,
+    gstAmount: purchaseData.gstAmount,
+    status: purchaseData.status || 'Verified',
+    items: purchaseData.items,
+    pdfUrl: purchaseData.pdfUrl
+  };
+  const doc = await createDocument(docData);
+  return mapDocToPurchase(doc);
 };
 
 const getPurchases = async (userId) => {
-  return dbQuery(
-    `SELECT id, user_id as "userId", supplier_name as "supplierName", supplier_gst as "supplierGst", invoice_number as "invoiceNumber", invoice_date as "invoiceDate", total, subtotal, gst_amount as "gstAmount", status, items, pdf_url as "pdfUrl", created_at as "createdAt" FROM purchase_invoices WHERE user_id = $1 ORDER BY created_at DESC`,
-    [userId]
-  );
+  const docs = await getUserDocuments(userId, 'purchase_invoice');
+  return docs.map(mapDocToPurchase);
 };
 
 module.exports = {
@@ -313,6 +445,13 @@ module.exports = {
   getUserByWhatsApp,
   updateUser,
   updateUserPassword,
+  createDocument,
+  getDocumentById,
+  getUserDocuments,
+  updateDocumentStatus,
+  updateDocumentPdfUrl,
+  deleteDocument,
+  getNextDocNumber,
   createInvoice,
   getInvoiceById,
   getUserInvoices,

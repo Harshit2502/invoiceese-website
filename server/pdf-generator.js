@@ -58,11 +58,23 @@ const numberToWords = (num) => {
   return str.trim() + (str.trim() === 'only' ? '' : ' Rupees');
 };
 
+const getDocTitle = (invoice, hasGst) => {
+  const titles = {
+    'sales_invoice': hasGst ? 'TAX INVOICE' : 'INVOICE',
+    'purchase_invoice': 'PURCHASE INVOICE',
+    'credit_note': 'CREDIT NOTE',
+    'debit_note': 'DEBIT NOTE',
+    'provisional_invoice': 'PROVISIONAL INVOICE',
+    'delivery_challan': 'DELIVERY CHALLAN'
+  };
+  return titles[invoice.docType] || (hasGst ? 'TAX INVOICE' : 'INVOICE');
+};
+
 const generateClassicPDF = (doc, invoice, user) => {
   const primaryColor = '#000000';
   const tableHeaderColor = '#b2ebf2';
   const hasGst = Boolean(user.gstNumber);
-  const badgeText = hasGst ? 'TAX INVOICE' : 'INVOICE';
+  const badgeText = getDocTitle(invoice, hasGst);
   const badgeColor = hasGst ? '#059669' : '#d97706';
 
   doc.fillColor(primaryColor).fontSize(20).font('Helvetica-Bold').text(user.businessName || 'My Business', 50, 50);
@@ -189,7 +201,7 @@ const generatePremiumPDF = (doc, invoice, user) => {
   const tableBorder = '#e5e7eb';
   const bgGray = '#f8fafc';
   const hasGst = Boolean(user.gstNumber);
-  const badgeText = hasGst ? 'TAX INVOICE' : 'INVOICE';
+  const badgeText = getDocTitle(invoice, hasGst);
   const badgeColor = hasGst ? '#059669' : '#d97706';
 
   const formatAmountNoSymbol = (val) => Number(val).toLocaleString('en-IN', { maximumFractionDigits: 2 });
@@ -368,7 +380,7 @@ const generateModernPDF = (doc, invoice, user) => {
   // Tax Invoice Banner
   drawLine(50, 85, 545, 85);
   drawRect(50, 87, 495, 20, headerBgColor);
-  doc.fontSize(16).text('Tax Invoice', 50, 90, { align: 'center', width: 495 });
+  doc.fontSize(16).text(getDocTitle(invoice, hasGst), 50, 90, { align: 'center', width: 495 });
   
   // Top fields grid
   const gridY1 = 107;
@@ -440,19 +452,30 @@ const generateModernPDF = (doc, invoice, user) => {
   drawLine(50, tableY, 545, tableY);
   drawRect(50, tableY, 495, 20, headerBgColor);
 
-  const cols = { sno: 50, desc: 75, hsn: 260, qty: 320, uom: 360, rate: 410, amount: 470 };
+  const hasDiscount = invoice.items && invoice.items.some(i => Number(i.discount) > 0);
+  const cols = hasDiscount 
+    ? { sno: 50, desc: 75, hsn: 240, qty: 290, uom: 320, rate: 360, disc: 410, amount: 470 }
+    : { sno: 50, desc: 75, hsn: 260, qty: 320, uom: 360, rate: 410, amount: 470 };
+
   doc.font('Helvetica-Bold').fontSize(7)
      .text('S.No.', cols.sno, tableY + 5, { width: cols.desc - cols.sno, align: 'center' })
      .text('Product Description', cols.desc, tableY + 5, { width: cols.hsn - cols.desc, align: 'center' })
      .text('HSN Code', cols.hsn, tableY + 5, { width: cols.qty - cols.hsn, align: 'center' })
      .text('QTY', cols.qty, tableY + 5, { width: cols.uom - cols.qty, align: 'center' })
      .text('UOM', cols.uom, tableY + 5, { width: cols.rate - cols.uom, align: 'center' })
-     .text('RATE', cols.rate, tableY + 5, { width: cols.amount - cols.rate, align: 'center' })
-     .text('TOTAL AMOUNT', cols.amount, tableY + 5, { width: 545 - cols.amount, align: 'center' });
+     .text('RATE', cols.rate, tableY + 5, { width: hasDiscount ? cols.disc - cols.rate : cols.amount - cols.rate, align: 'center' });
+  
+  if (hasDiscount) {
+    doc.text('DISC', cols.disc, tableY + 5, { width: cols.amount - cols.disc, align: 'center' });
+  }
+  doc.text('TOTAL AMOUNT', cols.amount, tableY + 5, { width: 545 - cols.amount, align: 'center' });
 
   // Draw table vertical lines down to total section
   const totalYStart = tableY + 20 + 200; // Fixed table height
-  [cols.desc, cols.hsn, cols.qty, cols.uom, cols.rate, cols.amount].forEach(x => {
+  const colLines = [cols.desc, cols.hsn, cols.qty, cols.uom, cols.rate];
+  if (hasDiscount) colLines.push(cols.disc);
+  colLines.push(cols.amount);
+  colLines.forEach(x => {
     drawLine(x, tableY, x, totalYStart);
   });
 
@@ -467,8 +490,12 @@ const generateModernPDF = (doc, invoice, user) => {
        .text(item.hsn || '', cols.hsn, currentY + 5, { width: cols.qty - cols.hsn, align: 'center' })
        .text(String(item.quantity || 1), cols.qty, currentY + 5, { width: cols.uom - cols.qty, align: 'center' })
        .text(item.uom || 'PCS.', cols.uom, currentY + 5, { width: cols.rate - cols.uom, align: 'center' })
-       .text(Number(item.unitPrice || 0).toFixed(2), cols.rate, currentY + 5, { width: cols.amount - cols.rate - 2, align: 'right' })
-       .text(Number(item.amount || 0).toFixed(2), cols.amount, currentY + 5, { width: 545 - cols.amount - 2, align: 'right' });
+       .text(Number(item.unitPrice || 0).toFixed(2), cols.rate, currentY + 5, { width: hasDiscount ? cols.disc - cols.rate - 2 : cols.amount - cols.rate - 2, align: 'right' });
+    
+    if (hasDiscount) {
+      doc.text(`${item.discount || 0}${item.discountType === '%' ? '%' : '₹'}`, cols.disc, currentY + 5, { width: cols.amount - cols.disc - 2, align: 'right' });
+    }
+    doc.text(Number(item.amount || 0).toFixed(2), cols.amount, currentY + 5, { width: 545 - cols.amount - 2, align: 'right' });
     drawLine(50, currentY + 20, 545, currentY + 20); // Horizontal line between items
     currentY += 20;
   });
@@ -549,7 +576,7 @@ const generateInvoicePDF = (invoice, user) => {
         fs.mkdirSync(pdfDir, { recursive: true });
       }
 
-      const fileName = `${invoice.invoiceNumber}.pdf`;
+      const fileName = `${invoice.id}.pdf`;
       const filePath = path.join(pdfDir, fileName);
 
       // Create PDF document
