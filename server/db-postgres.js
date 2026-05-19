@@ -21,7 +21,7 @@ const pool = process.env.DATABASE_URL
 const initializeDatabase = async () => {
   try {
     // Run migrations in order
-    const migrations = ['000_create_users_table.sql', '001_create_conversations_table.sql', '002_add_missing_fields.sql', '003_add_client_fields.sql', '004_add_gst_invoice_fields.sql', '005_add_inventory_and_purchases.sql', '006_widen_state_code_columns.sql', '007_invoice_number_per_user.sql'];
+    const migrations = ['000_create_users_table.sql', '001_create_conversations_table.sql', '002_add_missing_fields.sql', '003_add_client_fields.sql', '004_add_gst_invoice_fields.sql', '005_add_inventory_and_purchases.sql', '006_widen_state_code_columns.sql', '007_invoice_number_per_user.sql', '008_create_documents_table.sql'];
     
     for (const migration of migrations) {
       const migrationPath = path.join(__dirname, 'migrations', migration);
