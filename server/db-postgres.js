@@ -298,7 +298,6 @@ const deleteInvoice = async (invoiceId) => {
 
 const getNextInvoiceNumber = async (userId) => {
   return getNextDocNumber(userId, 'sales_invoice');
-};`;
 };
 
 // CONVERSATION FUNCTIONS
