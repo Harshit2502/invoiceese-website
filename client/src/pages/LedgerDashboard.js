@@ -31,7 +31,7 @@ function Sidebar({ screen, setScreen, user, logout }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <div className="wordmark">ShoeTrack</div>
+        <div className="wordmark">InvoiceEase</div>
         <div className="sub">Business Manager</div>
       </div>
 
