@@ -316,6 +316,10 @@
 
 /* ── DIVIDER ── */
 .divider { height: 1px; background: var(--border2); margin: 4px 0 12px; }
+/* ── MOBILE ELEMENTS (HIDDEN ON DESKTOP) ── */
+.hamburger-btn, .sidebar-close-btn, .sidebar-backdrop {
+  display: none;
+}
 
 /* ── MOBILE RESPONSIVE ── */
 @media (max-width: 768px) {
