@@ -120,6 +120,8 @@ const updateUserPassword = async (userId, newPasswordHash) => {
     [newPasswordHash, userId]
   );
   return result.rows[0];
+};
+
 // DOCUMENT FUNCTIONS
 const createDocument = async (docData) => {
   const { id, userId, docType, direction, parentDocumentId, docNumber, partyName, partyGst, partyAddress, partyMobile, partyState, partyStateCode, reverseCharge, transportMode, vehicleNumber, dateOfSupply, placeOfSupply, items, subtotal, gstRate, gstAmount, cgst, sgst, igst, gstType, total, serviceDescription, notes, dueDate, docDate, paymentDetails, pdfUrl, status, templateStyle, showWatermark } = docData;
@@ -412,7 +414,7 @@ const createPurchaseInvoice = async (purchaseData) => {
     userId: purchaseData.userId,
     docType: 'purchase_invoice',
     direction: 'inbound',
-    docNumber: purchaseData.invoiceNumber || \`PI-\${Date.now()}\`,
+    docNumber: purchaseData.invoiceNumber || `PI-${Date.now()}`,
     partyName: purchaseData.supplierName,
     partyGst: purchaseData.supplierGst,
     docDate: purchaseData.invoiceDate,
