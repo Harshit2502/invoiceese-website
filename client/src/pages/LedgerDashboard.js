@@ -88,9 +88,9 @@ function BottomNav({ screen, setScreen, setShowCreate }) {
   const nav = [
     { icon: LayoutDashboard, label: "Home", s: 0 },
     { icon: FileText, label: "Docs", s: 1 },
-    { icon: Plus, label: "Create", action: 'create' },
+    { icon: Upload, label: "Upload", s: 2 },
     { icon: BarChart2, label: "Stats", s: 4 },
-    { icon: Settings, label: "Settings", s: 5 },
+    { icon: Package, label: "Stocks", s: null },
   ];
 
   return (
@@ -945,9 +945,14 @@ export default function LedgerDashboard() {
               <Search size={14} color="#9ca3af" />
               <input placeholder="Search invoices, products…" />
             </div>
-            <button className="btn btn-terra" id="btn-create-mobile" onClick={() => setShowCreate(true)}>
-              <Plus size={13} /> Create Invoice
-            </button>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginLeft: 'auto' }}>
+              <button className="btn btn-terra" id="btn-create-mobile" onClick={() => setShowCreate(true)}>
+                <Plus size={13} /> Create Invoice
+              </button>
+              <button onClick={() => setScreen(5)} className="btn btn-ghost" style={{ padding: '8px', border: 'none', background: 'var(--border2)' }} title="Account Settings">
+                <Settings size={18} />
+              </button>
+            </div>
           </div>
 
           <div className="content">

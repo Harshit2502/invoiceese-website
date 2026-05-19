@@ -391,7 +391,8 @@
     display: none; /* Hide search bar on mobile to save space */
   }
   #btn-create-mobile {
-    display: none;
+    padding: 6px 10px;
+    font-size: 11px;
   }
   
   .content {
