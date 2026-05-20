@@ -24,7 +24,26 @@ publicRouter.get('/pdf/:id', async (req, res) => {
   const pdfPath = path.join(__dirname, '..', 'pdfs', `${invoice.id}.pdf`);
 
   if (!fs.existsSync(pdfPath)) {
-    return res.status(404).json({ error: 'PDF not found. Please regenerate the invoice.' });
+    try {
+      let user = null;
+      if (process.env.USE_POSTGRES === 'true') {
+        const pgFunctions = require('../db-postgres');
+        user = await pgFunctions.getUserById(invoice.userId);
+      } else {
+        user = db.users.find(u => u.id === invoice.userId);
+      }
+      
+      const { generateInvoicePDF } = require('../pdf-generator');
+      const pdfPayload = {
+        ...invoice,
+        subtotal: invoice.amount || invoice.subtotal || 0,
+        gstApplicable: (invoice.gstRate || 0) > 0,
+      };
+      await generateInvoicePDF(pdfPayload, user || {});
+    } catch (err) {
+      console.error('Failed to auto-regenerate PDF:', err);
+      return res.status(500).json({ error: 'PDF not found and failed to regenerate.' });
+    }
   }
 
   res.setHeader('Content-Type', 'application/pdf');
@@ -41,6 +60,21 @@ publicRouter.get('/pdf/:id', async (req, res) => {
 
 // All other invoice routes require auth
 router.use(authMiddleware);
+
+// GET /api/invoices/clients - fetch recurring clients
+router.get('/clients', async (req, res) => {
+  if (process.env.USE_POSTGRES !== 'true') {
+    return res.json({ clients: [] });
+  }
+  try {
+    const pgFunctions = require('../db-postgres');
+    const clients = await pgFunctions.getRecurringClients(req.userId);
+    res.json({ clients });
+  } catch (error) {
+    console.error('Error fetching recurring clients:', error);
+    res.status(500).json({ error: 'Failed to fetch clients' });
+  }
+});
 
 // GET /api/invoices - list user's invoices
 router.get('/', async (req, res) => {

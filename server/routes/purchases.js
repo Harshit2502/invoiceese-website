@@ -21,17 +21,13 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/purchases/extract (Gemini Vision OCR)
-router.post('/extract', async (req, res) => {
-  try {
-    const { image, mimeType } = req.body;
-    
-    if (!image) {
-      return res.status(400).json({ error: 'No image provided' });
+    let user = null;
+    if (process.env.USE_POSTGRES === 'true') {
+      const pgFunctions = require('../db-postgres');
+      user = await pgFunctions.getUserById(req.userId);
     }
-
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({ error: 'GEMINI_API_KEY is not configured' });
-    }
+    const businessName = user?.businessName || '';
+    const businessGst = user?.gstNumber || '';
 
     const { GoogleGenerativeAI } = require("@google/generative-ai");
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -39,13 +35,17 @@ router.post('/extract', async (req, res) => {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
     const prompt = `
-      You are an expert OCR and data extraction tool. Extract the following details from this purchase invoice.
+      You are an expert OCR and data extraction tool. Analyze this document. 
+      The current user's business name is "${businessName}" and their GSTIN is "${businessGst}".
+      Detect if this is a purchase invoice (issued TO the user's business by a supplier) or a sales invoice (issued BY the user's business to a customer) or a delivery challan / credit note / debit note / provisional bill.
+      
       Return ONLY a valid JSON object with the exact keys:
       {
-        "supplier": "Full name of the supplier/vendor",
+        "docType": "one of: purchase_invoice, sales_invoice, credit_note, debit_note, delivery_challan, provisional_invoice",
+        "supplier": "Full name of the party (if it is a purchase invoice, this is the vendor; if sales invoice, this is the client/buyer)",
         "invoiceNo": "Invoice number or bill number",
         "date": "Invoice date in YYYY-MM-DD format",
-        "gst": "Supplier's GSTIN if available",
+        "gst": "The other party's GSTIN if available",
         "items": [
           { "name": "Item description", "qty": Number, "unit": Number (Unit Price), "total": Number (Line total) }
         ],
@@ -88,75 +88,156 @@ router.post('/', async (req, res) => {
   if (process.env.USE_POSTGRES !== 'true') {
     return res.status(400).json({ error: 'Postgres required for purchases' });
   }
-  try {
-    const { supplier, invoiceNo, date, gst, items, subtotal, gstAmt, total } = req.body;
+    const { docType = 'purchase_invoice', supplier, invoiceNo, date, gst, items, subtotal, gstAmt, total } = req.body;
     
     if (!supplier || !total) {
-      return res.status(400).json({ error: 'Supplier and total are required' });
+      return res.status(400).json({ error: 'Supplier/Client and total are required' });
     }
 
     const pgFunctions = require('../db-postgres');
     const invoiceId = uuidv4();
     
-    // Process items and update products
-    let processedItems = [];
-    if (Array.isArray(items)) {
-      for (const item of items) {
-        let productId = null;
-        let product = await pgFunctions.getProductByName(req.userId, item.name);
-        
-        if (!product) {
-          // Auto-create product for loose inventory
-          product = await pgFunctions.createProduct({
-            id: uuidv4(),
-            userId: req.userId,
-            name: item.name,
-            stockQty: 0,
-            avgCost: Number(item.unit) || 0,
-            sellingPrice: (Number(item.unit) || 0) * 1.3 // 30% default markup
+    let resultDoc;
+    if (docType === 'purchase_invoice') {
+      // Process items and update products (Inbound stock addition)
+      let processedItems = [];
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          let productId = null;
+          let product = await pgFunctions.getProductByName(req.userId, item.name);
+          
+          if (!product) {
+            product = await pgFunctions.createProduct({
+              id: uuidv4(),
+              userId: req.userId,
+              name: item.name,
+              stockQty: 0,
+              avgCost: Number(item.unit) || 0,
+              sellingPrice: (Number(item.unit) || 0) * 1.3
+            });
+          }
+          
+          productId = product.id;
+          const newQty = Number(item.qty) || 0;
+          const currentQty = product.stockQty || 0;
+          const currentCost = product.avgCost || 0;
+          const itemCost = Number(item.unit) || 0;
+          
+          const totalNewQty = currentQty + newQty;
+          const newAvgCost = totalNewQty > 0 
+            ? ((currentQty * currentCost) + (newQty * itemCost)) / totalNewQty 
+            : itemCost;
+            
+          await pgFunctions.updateProductStock(productId, newQty, newAvgCost);
+          
+          processedItems.push({
+            productId,
+            description: item.name,
+            quantity: newQty,
+            unitPrice: itemCost,
+            amount: Number(item.total) || (newQty * itemCost)
           });
         }
-        
-        productId = product.id;
-        
-        // Calculate new average cost
-        const newQty = Number(item.qty) || 0;
-        const currentQty = product.stockQty || 0;
-        const currentCost = product.avgCost || 0;
-        const itemCost = Number(item.unit) || 0;
-        
-        const totalNewQty = currentQty + newQty;
-        const newAvgCost = totalNewQty > 0 
-          ? ((currentQty * currentCost) + (newQty * itemCost)) / totalNewQty 
-          : itemCost;
-          
-        await pgFunctions.updateProductStock(productId, newQty, newAvgCost);
-        
-        processedItems.push({
-          productId,
-          description: item.name,
-          quantity: newQty,
-          unitPrice: itemCost,
-          amount: Number(item.total) || (newQty * itemCost)
-        });
       }
+
+      resultDoc = await pgFunctions.createPurchaseInvoice({
+        id: invoiceId,
+        userId: req.userId,
+        supplierName: supplier,
+        supplierGst: gst,
+        invoiceNumber: invoiceNo,
+        invoiceDate: date,
+        total: Number(total),
+        subtotal: Number(subtotal),
+        gstAmount: Number(gstAmt),
+        status: 'Verified',
+        items: processedItems
+      });
+    } else {
+      // Process items (Outbound stock reduction)
+      let processedItems = [];
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          let productId = null;
+          let product = await pgFunctions.getProductByName(req.userId, item.name);
+          
+          if (!product) {
+            product = await pgFunctions.createProduct({
+              id: uuidv4(),
+              userId: req.userId,
+              name: item.name,
+              stockQty: 0,
+              avgCost: Number(item.unit) || 0,
+              sellingPrice: Number(item.unit) || 0
+            });
+          }
+          
+          productId = product.id;
+          const qty = Number(item.qty) || 0;
+          if (docType === 'credit_note') {
+            await pgFunctions.updateProductStock(productId, qty);
+          } else {
+            await pgFunctions.updateProductStock(productId, -qty);
+          }
+          
+          processedItems.push({
+            productId,
+            description: item.name,
+            quantity: qty,
+            unitPrice: Number(item.unit) || 0,
+            amount: Number(item.total) || (qty * (Number(item.unit) || 0))
+          });
+        }
+      }
+
+      // Generate PDF URL for the outbound document
+      let pdfUrl = null;
+      try {
+        const userMeta = await pgFunctions.getUserById(req.userId);
+        const { generateInvoicePDF } = require('../pdf-generator');
+        const pdfPayload = {
+          id: invoiceId,
+          userId: req.userId,
+          docType,
+          invoiceNumber: invoiceNo,
+          clientName: supplier,
+          clientGst: gst,
+          date,
+          items: processedItems,
+          amount: Number(subtotal),
+          gstRate: subtotal > 0 ? Math.round((Number(gstAmt) * 100) / Number(subtotal)) : 0,
+          gstAmount: Number(gstAmt),
+          totalAmount: Number(total),
+          status: 'unpaid',
+          createdAt: new Date().toISOString()
+        };
+        await generateInvoicePDF(pdfPayload, userMeta || {});
+        pdfUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/pdf/${invoiceId}`;
+      } catch (err) {
+        console.error('Failed to generate OCR outbound PDF:', err);
+      }
+
+      const doc = await pgFunctions.createDocument({
+        id: invoiceId,
+        userId: req.userId,
+        docType,
+        direction: 'outbound',
+        docNumber: invoiceNo,
+        partyName: supplier,
+        partyGst: gst,
+        items: processedItems,
+        subtotal: Number(subtotal),
+        gstRate: subtotal > 0 ? Math.round((Number(gstAmt) * 100) / Number(subtotal)) : 0,
+        gstAmount: Number(gstAmt),
+        total: Number(total),
+        docDate: date,
+        pdfUrl,
+        status: 'unpaid'
+      });
+      resultDoc = doc;
     }
 
-    const purchase = await pgFunctions.createPurchaseInvoice({
-      id: invoiceId,
-      userId: req.userId,
-      supplierName: supplier,
-      supplierGst: gst,
-      invoiceNumber: invoiceNo,
-      invoiceDate: date,
-      total: Number(total),
-      subtotal: Number(subtotal),
-      gstAmount: Number(gstAmt),
-      status: 'Verified',
-      items: processedItems
-    });
-
-    res.status(201).json({ purchase });
+    res.status(201).json({ purchase: resultDoc });
   } catch (error) {
     console.error('Error saving purchase:', error);
     res.status(500).json({ error: 'Failed to save purchase invoice' });

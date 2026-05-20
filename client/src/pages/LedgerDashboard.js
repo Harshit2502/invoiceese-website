@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import {
   LayoutDashboard, FileText, Upload, Package, BarChart2,
   TrendingUp, TrendingDown, Plus, Eye, ChevronRight,
-  ChevronLeft, CheckCircle, AlertCircle, Database, Settings, LogOut, Trash2, Search, Menu, X
+  ChevronLeft, CheckCircle, AlertCircle, Database, Settings, LogOut, Trash2, Search, Menu, X, Download
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
@@ -228,7 +228,7 @@ function Dashboard({ setScreen, user, stats, monthData, recentInvoices }) {
   );
 }
 
-function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoiceStatus, statusUpdating, deleteInvoice }) {
+function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoiceStatus, statusUpdating, deleteInvoice, handleExportCSV }) {
   const [filter, setFilter] = useState('all');
 
   const allDocs = useMemo(() => {
@@ -293,9 +293,17 @@ function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoi
           <div className="section-title">Documents</div>
           <div className="section-sub">All your buy-side and sell-side documents in one place</div>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-          <Plus size={14} /> Create Invoice
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn btn-ghost" onClick={() => handleExportCSV('sales')} style={{ gap: 6, display: 'flex', alignItems: 'center', background: '#eef2ff', color: '#4f46e5', border: '1px solid #c7d2fe', padding: '8px 12px', fontSize: 13, borderRadius: 8, fontWeight: 600 }}>
+            <Download size={14} /> Export Sales (Excel)
+          </button>
+          <button className="btn btn-ghost" onClick={() => handleExportCSV('purchases')} style={{ gap: 6, display: 'flex', alignItems: 'center', background: '#fef3c7', color: '#d97706', border: '1px solid #fde68a', padding: '8px 12px', fontSize: 13, borderRadius: 8, fontWeight: 600 }}>
+            <Download size={14} /> Export Purchases (Excel)
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+            <Plus size={14} /> Create Invoice
+          </button>
+        </div>
       </div>
 
       <div className="doc-type-grid">
@@ -425,7 +433,7 @@ function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoi
   );
 }
 
-function UploadInvoice({ setScreen, authFetch, setExtractedData }) {
+function UploadInvoice({ setScreen, authFetch, setExtractedData, setExtractedImage }) {
   const [dragOver, setDragOver] = useState(false);
   const [progress, setProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
@@ -466,6 +474,7 @@ function UploadInvoice({ setScreen, authFetch, setExtractedData }) {
             const json = await res.json();
             setProgress(100);
             setExtractedData(json.data);
+            setExtractedImage(base64Data);
             setTimeout(() => setScreen(3), 400);
           } else {
             const errData = await res.json();
@@ -587,10 +596,81 @@ function UploadInvoice({ setScreen, authFetch, setExtractedData }) {
   );
 }
 
-function ReviewExtraction({ setScreen, extractedData, authFetch, fetchPurchases, fetchProducts }) {
+function ReviewExtraction({ setScreen, extractedData, extractedImage, authFetch, fetchPurchases, fetchProducts }) {
+  const [form, setForm] = useState({
+    docType: extractedData?.docType || 'purchase_invoice',
+    supplier: extractedData?.supplier || '',
+    invoiceNo: extractedData?.invoiceNo || '',
+    date: extractedData?.date || '',
+    gst: extractedData?.gst || '',
+    items: extractedData?.items || [],
+    subtotal: extractedData?.subtotal || 0,
+    gstAmt: extractedData?.gstAmt || 0,
+    total: extractedData?.total || 0,
+  });
+
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const handleItemChange = (index, field, value) => {
+    const nextItems = [...form.items];
+    nextItems[index] = {
+      ...nextItems[index],
+      [field]: value,
+      total: field === 'qty' || field === 'unit' 
+        ? Number(value) * Number(nextItems[index][field === 'qty' ? 'unit' : 'qty'] || 0)
+        : nextItems[index].total
+    };
+    
+    const sub = nextItems.reduce((sum, item) => sum + (Number(item.qty || 0) * Number(item.unit || 0)), 0);
+    const tax = Math.round(sub * 0.18 * 100) / 100;
+    
+    setForm(prev => {
+      const targetTax = prev.gstAmt === (extractedData?.gstAmt || 0) ? tax : prev.gstAmt;
+      return {
+        ...prev,
+        items: nextItems,
+        subtotal: sub,
+        gstAmt: targetTax,
+        total: sub + targetTax
+      };
+    });
+  };
+
+  const addItem = () => {
+    setForm(prev => {
+      const nextItems = [...prev.items, { name: '', qty: 1, unit: 0, total: 0, conf: 1 }];
+      return { ...prev, items: nextItems };
+    });
+  };
+
+  const removeItem = (index) => {
+    setForm(prev => {
+      const nextItems = prev.items.filter((_, i) => i !== index);
+      const sub = nextItems.reduce((sum, item) => sum + (Number(item.qty || 0) * Number(item.unit || 0)), 0);
+      const tax = Math.round(sub * 0.18 * 100) / 100;
+      const targetTax = prev.gstAmt === (extractedData?.gstAmt || 0) ? tax : prev.gstAmt;
+      return {
+        ...prev,
+        items: nextItems,
+        subtotal: sub,
+        gstAmt: targetTax,
+        total: sub + targetTax
+      };
+    });
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm(prev => {
+      const updated = { ...prev, [name]: value };
+      if (name === 'subtotal' || name === 'gstAmt') {
+        updated.total = Number(updated.subtotal || 0) + Number(updated.gstAmt || 0);
+      }
+      return updated;
+    });
+  };
 
   const confirm = async () => {
     setLoading(true);
@@ -598,13 +678,13 @@ function ReviewExtraction({ setScreen, extractedData, authFetch, fetchPurchases,
     try {
       const res = await authFetch('/api/purchases', {
         method: 'POST',
-        body: JSON.stringify(extractedData)
+        body: JSON.stringify(form)
       });
       if (res.ok) {
         setSaved(true);
         fetchPurchases();
         fetchProducts();
-        setTimeout(() => setScreen(4), 1000); // Redirect to analytics
+        setTimeout(() => setScreen(1), 1000); // Redirect to Invoice Hub
       } else {
         const data = await res.json();
         throw new Error(data.error || 'Failed to save');
@@ -629,60 +709,115 @@ function ReviewExtraction({ setScreen, extractedData, authFetch, fetchPurchases,
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr', gap: 20 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ background: 'var(--cream)', padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Supplier Details</div>
-            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13 }}>
-              {[
-                { label: "Supplier", val: extractedData.supplier },
-                { label: "Invoice no", val: extractedData.invoiceNo },
-                { label: "Date", val: extractedData.date },
-                { label: "GST no", val: extractedData.gst },
-              ].map(f => (
-                <div key={f.label} style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                  <span style={{ color: "var(--ink3)", fontSize: 12, width: 80, flexShrink: 0 }}>{f.label}</span>
-                  <input defaultValue={f.val} style={{ flex: 1, border: "1px solid var(--border)", borderRadius: 6, padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: "#fff", minWidth: 0, outline: 'none' }} />
-                </div>
-              ))}
+            <div style={{ background: 'var(--cream)', padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Document Classification</div>
+            <div style={{ padding: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
+              <span style={{ color: "var(--ink3)", fontSize: 12, width: 90, flexShrink: 0 }}>Save As</span>
+              <select name="docType" value={form.docType} onChange={handleChange} style={{ flex: 1, border: "1px solid var(--border)", borderRadius: 6, padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: "#fff", outline: 'none' }}>
+                <option value="purchase_invoice">Purchase Invoice (Inbound Stock)</option>
+                <option value="sales_invoice">Sales Invoice (Outbound Stock)</option>
+                <option value="credit_note">Credit Note (Outbound Stock Return)</option>
+                <option value="debit_note">Debit Note (Outbound Stock Deduction)</option>
+                <option value="delivery_challan">Delivery Challan (Outbound)</option>
+                <option value="provisional_invoice">Provisional Invoice (Outbound)</option>
+              </select>
             </div>
           </div>
 
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ background: 'var(--cream)', padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Line Items</div>
-            {extractedData.items.map((item, i) => (
-              <div key={i} style={{ padding: "12px 16px", borderTop: i > 0 ? "1px solid var(--border2)" : "none" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <span style={{ fontWeight: 600, color: "var(--ink)" }}>{item.name}</span>
-                  <span style={{ background: item.conf > 0.95 ? "#d1fae5" : "#fef9c3", color: item.conf > 0.95 ? "#065f46" : "#92400e", padding: "2px 8px", borderRadius: 6, fontSize: 11 }}>{Math.round(item.conf * 100)}%</span>
-                </div>
-                <div style={{ display: "flex", gap: 16, color: "var(--ink3)", fontSize: 12 }}>
-                  <span>Qty: <strong style={{ color: "var(--ink2)" }}>{item.qty}</strong></span>
-                  <span>@ ₹<strong style={{ color: "var(--ink2)" }}>{item.unit.toLocaleString()}</strong></span>
-                  <span>= <strong style={{ color: "var(--green)" }}>₹{item.total.toLocaleString()}</strong></span>
-                </div>
+            <div style={{ background: 'var(--cream)', padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Party & Header Details</div>
+            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13 }}>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <span style={{ color: "var(--ink3)", fontSize: 12, width: 90, flexShrink: 0 }}>Party Name</span>
+                <input name="supplier" value={form.supplier} onChange={handleChange} style={{ flex: 1, border: "1px solid var(--border)", borderRadius: 6, padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: "#fff", outline: 'none' }} required />
               </div>
-            ))}
-            <div style={{ padding: "12px 16px", borderTop: "2px solid var(--border)", background: "var(--cream)", fontWeight: 700, fontSize: 14, display: "flex", justifyContent: "space-between" }}>
-              <span>Total payable</span>
-              <span style={{ color: "var(--green)" }}>₹{extractedData.total.toLocaleString()}</span>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <span style={{ color: "var(--ink3)", fontSize: 12, width: 90, flexShrink: 0 }}>Document No</span>
+                <input name="invoiceNo" value={form.invoiceNo} onChange={handleChange} style={{ flex: 1, border: "1px solid var(--border)", borderRadius: 6, padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: "#fff", outline: 'none' }} />
+              </div>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <span style={{ color: "var(--ink3)", fontSize: 12, width: 90, flexShrink: 0 }}>Date</span>
+                <input name="date" type="date" value={form.date} onChange={handleChange} style={{ flex: 1, border: "1px solid var(--border)", borderRadius: 6, padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: "#fff", outline: 'none' }} />
+              </div>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <span style={{ color: "var(--ink3)", fontSize: 12, width: 90, flexShrink: 0 }}>GSTIN</span>
+                <input name="gst" value={form.gst} onChange={handleChange} style={{ flex: 1, border: "1px solid var(--border)", borderRadius: 6, padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: "#fff", outline: 'none' }} />
+              </div>
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--cream)', padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Line Items</span>
+              <button type="button" onClick={addItem} style={{ background: 'var(--green)', color: '#fff', border: 'none', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>+ Add Item</button>
+            </div>
+            <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {form.items.map((item, i) => (
+                <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", background: '#f9fafb', padding: 8, borderRadius: 6, border: '1px solid #f3f4f6' }}>
+                  <input 
+                    placeholder="Description" 
+                    value={item.name} 
+                    onChange={e => handleItemChange(i, 'name', e.target.value)} 
+                    style={{ flex: 2, border: "1px solid var(--border)", borderRadius: 4, padding: "6px 10px", fontSize: 12, background: "#fff", minWidth: 0 }}
+                  />
+                  <input 
+                    type="number" 
+                    placeholder="Qty" 
+                    value={item.qty} 
+                    onChange={e => handleItemChange(i, 'qty', Number(e.target.value))} 
+                    style={{ width: 60, border: "1px solid var(--border)", borderRadius: 4, padding: "6px 10px", fontSize: 12, background: "#fff", textAlign: 'center' }}
+                  />
+                  <input 
+                    type="number" 
+                    placeholder="Price" 
+                    value={item.unit} 
+                    onChange={e => handleItemChange(i, 'unit', Number(e.target.value))} 
+                    style={{ width: 80, border: "1px solid var(--border)", borderRadius: 4, padding: "6px 10px", fontSize: 12, background: "#fff" }}
+                  />
+                  <div style={{ width: 80, fontWeight: 600, fontSize: 12, color: 'var(--ink)', textAlign: 'right' }}>
+                    ₹{((item.qty || 0) * (item.unit || 0)).toLocaleString()}
+                  </div>
+                  <button type="button" onClick={() => removeItem(i)} style={{ border: 'none', background: 'none', color: '#ef4444', fontSize: 16, cursor: 'pointer', padding: '0 4px' }}>&times;</button>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--border)', padding: 16, background: '#f9fafb', fontSize: 13, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--ink3)' }}>Subtotal:</span>
+                <input type="number" name="subtotal" value={form.subtotal} onChange={handleChange} style={{ width: 100, border: "1px solid var(--border)", borderRadius: 4, padding: "4px 8px", fontSize: 12, textAlign: 'right' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--ink3)' }}>GST / Taxes:</span>
+                <input type="number" name="gstAmt" value={form.gstAmt} onChange={handleChange} style={{ width: 100, border: "1px solid var(--border)", borderRadius: 4, padding: "4px 8px", fontSize: 12, textAlign: 'right' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border2)', paddingTop: 8, fontWeight: 700 }}>
+                <span>Grand Total:</span>
+                <span style={{ color: 'var(--green-m)' }}>₹{form.total.toLocaleString()}</span>
+              </div>
             </div>
           </div>
 
           {error && <div className="alert alert-warn">{error}</div>}
 
           <button onClick={confirm} disabled={loading || saved} className="btn btn-primary" style={{ justifyContent: 'center', padding: '14px', width: '100%', fontSize: 14 }}>
-            <CheckCircle size={16} /> {saved ? "Saved! Loading analytics..." : loading ? "Saving..." : "Confirm & Save Invoice"}
+            <CheckCircle size={16} /> {saved ? "Saved! Opening Invoice Hub..." : loading ? "Saving..." : "Confirm & Save Document"}
           </button>
         </div>
 
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ background: 'var(--cream)', padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Original PDF Preview</div>
-          <div style={{ padding: 20, height: "100%", minHeight: 400, background: "var(--cream)", display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ color: 'var(--ink3)', textAlign: 'center' }}>
-              <FileText size={48} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
-              <p>Invoice rendering securely...</p>
-            </div>
+        <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ background: 'var(--cream)', padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Uploaded Document View</div>
+          <div style={{ padding: 12, flex: 1, background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 500, overflowY: 'auto' }}>
+            {extractedImage ? (
+              <img src={extractedImage} alt="Uploaded receipt preview" style={{ maxWidth: '100%', maxHeight: '75vh', objectFit: 'contain', borderRadius: 6, boxShadow: '0 4px 8px rgba(0,0,0,0.15)' }} />
+            ) : (
+              <div style={{ color: 'var(--ink3)', textAlign: 'center' }}>
+                <FileText size={48} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+                <p>No document preview available.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -690,7 +825,7 @@ function ReviewExtraction({ setScreen, extractedData, authFetch, fetchPurchases,
   );
 }
 
-function Analytics({ products, stats }) {
+function Analytics({ products, stats, handleExportCSV }) {
   const inventoryData = products.map(p => {
     const margin = p.sellingPrice > 0 ? Math.round(((p.sellingPrice - p.avgCost) / p.sellingPrice) * 100) : 0;
     return { name: p.name, remaining: p.stockQty, margin, bought: p.stockQty, sold: 0, pl: (p.sellingPrice - p.avgCost) * p.stockQty };
@@ -703,10 +838,15 @@ function Analytics({ products, stats }) {
           <div className="section-title">Analytics</div>
           <div className="section-sub">Auto-generated from your sales & purchase invoices</div>
         </div>
-        <div className="pill-tabs">
-          <button className="pill-tab active">YTD</button>
-          <button className="pill-tab">Last 3 months</button>
-          <button className="pill-tab">This year</button>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button className="btn btn-ghost" onClick={() => handleExportCSV('stocks')} style={{ gap: 6, display: 'flex', alignItems: 'center', background: 'var(--border2)', color: 'var(--ink2)', border: '1px solid var(--border)', padding: '8px 12px', fontSize: 13, borderRadius: 8, fontWeight: 600 }}>
+            <Download size={14} /> Export Stocks (Excel)
+          </button>
+          <div className="pill-tabs">
+            <button className="pill-tab active">YTD</button>
+            <button className="pill-tab">Last 3 months</button>
+            <button className="pill-tab">This year</button>
+          </div>
         </div>
       </div>
 
@@ -821,6 +961,7 @@ export default function LedgerDashboard() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [extractedData, setExtractedData] = useState(null);
+  const [extractedImage, setExtractedImage] = useState(null);
 
   const fetchInvoices = async () => {
     try {
@@ -886,6 +1027,69 @@ export default function LedgerDashboard() {
   useEffect(() => {
     Promise.all([fetchInvoices(), fetchPurchases(), fetchProducts()]).finally(() => setLoading(false));
   }, []);
+
+  const handleExportCSV = (type) => {
+    let headers = [];
+    let rows = [];
+    
+    const escapeCSV = (val) => {
+      if (val === null || val === undefined) return '';
+      let str = String(val);
+      str = str.replace(/"/g, '""');
+      if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+        return `"${str}"`;
+      }
+      return str;
+    };
+
+    if (type === 'sales') {
+      headers = ["Invoice Number", "Document Type", "Client Name", "Client GSTIN", "Date", "Subtotal", "GST Amount", "Total Amount", "Status"];
+      rows = invoices.map(inv => [
+        escapeCSV(inv.invoiceNumber),
+        escapeCSV(inv.docType),
+        escapeCSV(inv.clientName),
+        escapeCSV(inv.clientGst),
+        escapeCSV(inv.date),
+        inv.amount || 0,
+        inv.gstAmount || 0,
+        inv.totalAmount || 0,
+        escapeCSV(inv.status)
+      ]);
+    } else if (type === 'purchases') {
+      headers = ["Invoice Number", "Supplier Name", "Supplier GSTIN", "Date", "Subtotal", "GST Amount", "Total Amount", "Status"];
+      rows = purchases.map(pur => [
+        escapeCSV(pur.invoiceNumber),
+        escapeCSV(pur.supplierName),
+        escapeCSV(pur.supplierGst),
+        escapeCSV(pur.invoiceDate),
+        pur.subtotal || 0,
+        pur.gstAmount || 0,
+        pur.total || 0,
+        escapeCSV(pur.status)
+      ]);
+    } else if (type === 'stocks') {
+      headers = ["Product Name", "SKU", "Stock Quantity", "Average Cost", "Selling Price", "Total Stock Value"];
+      rows = products.map(prod => [
+        escapeCSV(prod.name),
+        escapeCSV(prod.sku),
+        prod.stockQty || 0,
+        prod.avgCost || 0,
+        prod.sellingPrice || 0,
+        (prod.stockQty || 0) * (prod.avgCost || 0)
+      ]);
+    }
+
+    const csvRows = [headers, ...rows];
+    const csvContent = "\uFEFF" + csvRows.map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${type}_report_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const stats = useMemo(() => {
     const revenue = invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || inv.amount || 0), 0);
@@ -957,10 +1161,10 @@ export default function LedgerDashboard() {
 
           <div className="content">
             {screen === 0 && <Dashboard setScreen={setScreen} user={user} stats={stats} monthData={monthData} recentInvoices={recentInvoices} />}
-            {screen === 1 && <InvoiceHub setScreen={setScreen} invoices={invoices} purchases={purchases} setShowCreate={setShowCreate} updateInvoiceStatus={updateInvoiceStatus} statusUpdating={statusUpdating} deleteInvoice={deleteInvoice} />}
-            {screen === 2 && <UploadInvoice setScreen={setScreen} authFetch={authFetch} setExtractedData={setExtractedData} />}
-            {screen === 3 && <ReviewExtraction setScreen={setScreen} extractedData={extractedData} authFetch={authFetch} fetchPurchases={fetchPurchases} fetchProducts={fetchProducts} />}
-            {screen === 4 && <Analytics products={products} stats={stats} />}
+            {screen === 1 && <InvoiceHub setScreen={setScreen} invoices={invoices} purchases={purchases} setShowCreate={setShowCreate} updateInvoiceStatus={updateInvoiceStatus} statusUpdating={statusUpdating} deleteInvoice={deleteInvoice} handleExportCSV={handleExportCSV} />}
+            {screen === 2 && <UploadInvoice setScreen={setScreen} authFetch={authFetch} setExtractedData={setExtractedData} setExtractedImage={setExtractedImage} />}
+            {screen === 3 && <ReviewExtraction setScreen={setScreen} extractedData={extractedData} extractedImage={extractedImage} authFetch={authFetch} fetchPurchases={fetchPurchases} fetchProducts={fetchProducts} />}
+            {screen === 4 && <Analytics products={products} stats={stats} handleExportCSV={handleExportCSV} />}
             {screen === 5 && <SettingsScreen user={user} setUser={setUser} authFetch={authFetch} />}
           </div>
         </main>

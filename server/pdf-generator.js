@@ -58,6 +58,42 @@ const numberToWords = (num) => {
   return str.trim() + (str.trim() === 'only' ? '' : ' Rupees');
 };
 
+const getDocLabel = (docType) => {
+  const labels = {
+    'sales_invoice': 'Sale Bill no.',
+    'purchase_invoice': 'Purchase Bill no.',
+    'credit_note': 'Credit Note no.',
+    'debit_note': 'Debit Note no.',
+    'provisional_invoice': 'Provisional Bill no.',
+    'delivery_challan': 'Challan no.'
+  };
+  return labels[docType] || 'Bill no.';
+};
+
+const getDocDateLabel = (docType) => {
+  const labels = {
+    'sales_invoice': 'Invoice Date',
+    'purchase_invoice': 'Purchase Date',
+    'credit_note': 'Credit Note Date',
+    'debit_note': 'Debit Note Date',
+    'provisional_invoice': 'Bill Date',
+    'delivery_challan': 'Challan Date'
+  };
+  return labels[docType] || 'Date';
+};
+
+const getDocIdLabel = (docType) => {
+  const labels = {
+    'sales_invoice': 'Invoice No',
+    'purchase_invoice': 'Purchase Invoice No',
+    'credit_note': 'Credit Note No',
+    'debit_note': 'Debit Note No',
+    'provisional_invoice': 'Provisional Bill No',
+    'delivery_challan': 'Challan No'
+  };
+  return labels[docType] || 'Doc No';
+};
+
 const getDocTitle = (invoice, hasGst) => {
   const titles = {
     'sales_invoice': hasGst ? 'TAX INVOICE' : 'INVOICE',
@@ -81,8 +117,8 @@ const generateClassicPDF = (doc, invoice, user) => {
   doc.fontSize(10).font('Helvetica').text(`GST: ${user.gstNumber || 'N/A'}`, 50, 75);
 
   doc.fontSize(10).font('Helvetica')
-     .text(`Original • #Sale Bill no. ${invoice.invoiceNumber}`, 350, 50, { align: 'right' })
-     .text(`Date: ${new Date(invoice.date || new Date()).toLocaleDateString('en-IN')}`, 350, 70, { align: 'right' });
+     .text(`Original • #${getDocLabel(invoice.docType)} ${invoice.invoiceNumber}`, 350, 50, { align: 'right' })
+     .text(`${getDocDateLabel(invoice.docType)}: ${new Date(invoice.date || new Date()).toLocaleDateString('en-IN')}`, 350, 70, { align: 'right' });
 
   doc.fillColor(badgeColor).fontSize(14).font('Helvetica-Bold').text(badgeText, 350, 30, { align: 'right' });
 
@@ -194,6 +230,107 @@ const generateClassicPDF = (doc, invoice, user) => {
   doc.end();
 };
 
+const generateMinimalPDF = (doc, invoice, user) => {
+  const primaryColor = '#111827';
+  const textColor = '#1f2937';
+  const mutedColor = '#4b5563';
+  const tableBorder = '#e5e7eb';
+  const hasGst = Boolean(user.gstNumber);
+  const badgeText = getDocTitle(invoice, hasGst);
+
+  // Simple clean header
+  doc.fillColor(primaryColor).fontSize(22).font('Helvetica-Bold').text(user.businessName || 'My Business', 50, 50);
+  doc.fontSize(10).font('Helvetica').text(user.address || '', 50, 75);
+  doc.text(`GST: ${user.gstNumber || 'N/A'}`, 50, 90);
+
+  // Label and Invoice details
+  doc.fontSize(16).font('Helvetica-Bold').text(badgeText, 350, 50, { align: 'right' });
+  doc.fontSize(10).font('Helvetica').text(`${getDocIdLabel(invoice.docType)}: ${invoice.invoiceNumber}`, 350, 75, { align: 'right' });
+  doc.text(`${getDocDateLabel(invoice.docType)}: ${new Date(invoice.date || new Date()).toLocaleDateString('en-IN')}`, 350, 90, { align: 'right' });
+
+  // Divider
+  doc.moveTo(50, 115).lineTo(545, 115).lineWidth(1).stroke('#d1d5db');
+
+  // Parties info
+  const partyY = 130;
+  doc.font('Helvetica-Bold').text('BILLED TO:', 50, partyY);
+  doc.font('Helvetica').text(invoice.clientName || '', 50, partyY + 15);
+  if (invoice.clientAddress) doc.text(invoice.clientAddress, 50, partyY + 30);
+  if (invoice.clientMobile) doc.text(`Mobile: ${invoice.clientMobile}`, 50, partyY + 45);
+  if (invoice.clientGst) doc.text(`GSTIN: ${invoice.clientGst}`, 50, partyY + 60);
+
+  // Table header
+  let tableTop = 230;
+  const colPositions = hasGst 
+    ? { sno: 65, items: 100, hsn: 230, priceUnit: 300, qty: 370, total: 460 }
+    : { sno: 65, items: 110, priceUnit: 280, qty: 370, total: 460 };
+
+  doc.font('Helvetica-Bold').fontSize(10);
+  doc.text('#', colPositions.sno, tableTop)
+     .text('Item Description', colPositions.items, tableTop);
+  if (hasGst) doc.text('HSN/SAC', colPositions.hsn, tableTop);
+  doc.text('Price', colPositions.priceUnit, tableTop, { width: 60, align: 'right' })
+     .text('Qty', colPositions.qty, tableTop, { width: 50, align: 'center' })
+     .text('Total', colPositions.total, tableTop, { width: 80, align: 'right' });
+
+  doc.moveTo(50, tableTop + 15).lineTo(545, tableTop + 15).lineWidth(1).stroke('#d1d5db');
+
+  let itemsY = tableTop + 25;
+  doc.font('Helvetica').fontSize(10);
+  const invoiceItems = Array.isArray(invoice.items) && invoice.items.length > 0 ? invoice.items : [{ description: invoice.service || 'Service', quantity: 1, unitPrice: Number(invoice.subtotal || invoice.amount) || 0, amount: Number(invoice.subtotal || invoice.amount) || 0 }];
+
+  invoiceItems.forEach((item, i) => {
+    const qty = Number(item.quantity || 1);
+    const unitPrice = Number(item.unitPrice || 0);
+    const amt = Number(item.amount || (qty * unitPrice));
+    
+    doc.text(String(i + 1), colPositions.sno, itemsY)
+       .text(item.description || 'Item', colPositions.items, itemsY, { width: hasGst ? 125 : 160 });
+    if (hasGst) doc.text(item.hsn || '', colPositions.hsn, itemsY);
+    doc.text(unitPrice.toLocaleString('en-IN'), colPositions.priceUnit, itemsY, { width: 60, align: 'right' })
+       .text(String(qty), colPositions.qty, itemsY, { width: 50, align: 'center' })
+       .text(amt.toLocaleString('en-IN'), colPositions.total, itemsY, { width: 80, align: 'right' });
+    
+    itemsY += 20;
+  });
+
+  doc.moveTo(50, itemsY).lineTo(545, itemsY).lineWidth(1).stroke('#d1d5db');
+
+  let totalsY = itemsY + 10;
+  const finalTotal = Number(invoice.totalAmount || invoice.total || invoice.amount || 0);
+
+  doc.font('Helvetica-Bold').text('Subtotal', 350, totalsY)
+     .text(Number(invoice.amount || invoice.subtotal || 0).toLocaleString('en-IN'), colPositions.total, totalsY, { width: 80, align: 'right' });
+  totalsY += 20;
+
+  if (invoice.gstAmount > 0 && hasGst) {
+    const halfGst = (Number(invoice.gstAmount) / 2).toLocaleString('en-IN');
+    const halfRate = (Number(invoice.gstRate) / 2).toFixed(1);
+    doc.text(`CGST (${halfRate}%)`, 350, totalsY)
+       .text(halfGst, colPositions.total, totalsY, { width: 80, align: 'right' });
+    totalsY += 20;
+    doc.text(`SGST (${halfRate}%)`, 350, totalsY)
+       .text(halfGst, colPositions.total, totalsY, { width: 80, align: 'right' });
+    totalsY += 20;
+  }
+
+  doc.moveTo(350, totalsY).lineTo(545, totalsY).lineWidth(1).stroke('#d1d5db');
+  totalsY += 10;
+
+  doc.fontSize(12).text('Total', 350, totalsY)
+     .text(`INR ${finalTotal.toLocaleString('en-IN')}`, colPositions.total, totalsY, { width: 80, align: 'right' });
+
+  // Watermark
+  if (invoice.showWatermark) {
+    doc.save();
+    doc.rotate(-35, { origin: [300, 420] });
+    doc.fillColor('#94a3b8').opacity(0.12).fontSize(44).font('Helvetica-Bold').text('InvoiceEase', 135, 420, { align: 'center', width: 320 });
+    doc.restore(); doc.opacity(1);
+  }
+
+  doc.end();
+};
+
 const generatePremiumPDF = (doc, invoice, user) => {
   const primaryColor = '#c2591d'; // Orange/brown
   const textColor = '#000000';
@@ -216,7 +353,7 @@ const generatePremiumPDF = (doc, invoice, user) => {
 
   doc.fillColor(badgeColor).fontSize(12).font('Helvetica-Bold').text(badgeText, 300, 35, { width: 245, align: 'right' });
   doc.fillColor(textColor).fontSize(16).font('Helvetica-Bold').text(`No. ${invoice.invoiceNumber || '1'}`, 300, 52, { width: 245, align: 'right' });
-  doc.fillColor(textColor).fontSize(10).font('Helvetica-Bold').text(`Invoice Date: ${new Date(invoice.date || new Date()).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`, 300, 75, { width: 245, align: 'right' });
+  doc.fillColor(textColor).fontSize(10).font('Helvetica-Bold').text(`${getDocDateLabel(invoice.docType)}: ${new Date(invoice.date || new Date()).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`, 300, 75, { width: 245, align: 'right' });
 
   // 2. Bill To Box
   const billToY = 110;
@@ -389,12 +526,12 @@ const generateModernPDF = (doc, invoice, user) => {
   drawLine(colMid, gridY1, colMid, 167); // Middle vertical line
 
   doc.fontSize(9).font('Helvetica-Bold');
-  doc.text('Invoice No:', 52, gridY1 + 4, { width: 80 }); doc.font('Helvetica').text(invoice.invoiceNumber, 132, gridY1 + 4);
+  doc.text(`${getDocIdLabel(invoice.docType)}:`, 52, gridY1 + 4, { width: 90 }); doc.font('Helvetica').text(invoice.invoiceNumber, 152, gridY1 + 4);
   doc.font('Helvetica-Bold').text('Transport Mode', colMid + 2, gridY1 + 4, { width: 90 }); doc.font('Helvetica').text(`: ${invoice.transportMode || 'NA'}`, colMid + 92, gridY1 + 4);
 
   const gridY2 = gridY1 + 15;
   drawLine(50, gridY2, 545, gridY2);
-  doc.font('Helvetica-Bold').text('Invoice date:', 52, gridY2 + 4, { width: 80 }); doc.font('Helvetica').text(new Date(invoice.date).toLocaleDateString('en-IN'), 132, gridY2 + 4);
+  doc.font('Helvetica-Bold').text(`${getDocDateLabel(invoice.docType)}:`, 52, gridY2 + 4, { width: 90 }); doc.font('Helvetica').text(new Date(invoice.date).toLocaleDateString('en-IN'), 152, gridY2 + 4);
   doc.font('Helvetica-Bold').text('Vehicle number', colMid + 2, gridY2 + 4, { width: 90 }); doc.font('Helvetica').text(`: ${invoice.vehicleNumber || 'NA'}`, colMid + 92, gridY2 + 4);
 
   const gridY3 = gridY2 + 15;
@@ -603,6 +740,13 @@ const generateInvoicePDF = (invoice, user) => {
 
       if (invoice.templateStyle === 'premium') {
         generatePremiumPDF(doc, invoice, user);
+        stream.on('finish', () => resolve({ fileName, filePath, url: `/pdf/${invoice.id}` }));
+        stream.on('error', (err) => reject(err));
+        return;
+      }
+
+      if (invoice.templateStyle === 'minimal') {
+        generateMinimalPDF(doc, invoice, user);
         stream.on('finish', () => resolve({ fileName, filePath, url: `/pdf/${invoice.id}` }));
         stream.on('error', (err) => reject(err));
         return;

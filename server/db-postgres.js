@@ -434,6 +434,33 @@ const getPurchases = async (userId) => {
   return docs.map(mapDocToPurchase);
 };
 
+const getRecurringClients = async (userId) => {
+  return dbQuery(
+    `SELECT party_name as "name", party_gst as "gst", party_address as "address", party_mobile as "mobile", party_state as "state", party_state_code as "stateCode" 
+     FROM (
+       SELECT party_name, party_gst, party_address, party_mobile, party_state, party_state_code, ROW_NUMBER() OVER (PARTITION BY party_name ORDER BY created_at DESC) as rn
+       FROM documents 
+       WHERE user_id = $1 AND party_name IS NOT NULL AND party_name != ''
+     ) t
+     WHERE rn = 1 AND party_name IN (
+       SELECT party_name FROM documents WHERE user_id = $1 GROUP BY party_name HAVING COUNT(*) >= 2
+     )
+     ORDER BY party_name ASC`,
+    [userId]
+  );
+};
+
+const updateProduct = async (productId, { name, sku, stockQty, avgCost, sellingPrice }) => {
+  return dbQuerySingle(
+    `UPDATE products SET name = $1, sku = $2, stock_qty = $3, avg_cost = $4, selling_price = $5, updated_at = NOW() WHERE id = $6 RETURNING id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice"`,
+    [name, sku, Number(stockQty) || 0, Number(avgCost) || 0, Number(sellingPrice) || 0, productId]
+  );
+};
+
+const deleteProduct = async (productId) => {
+  return dbExecute(`DELETE FROM products WHERE id = $1`, [productId]);
+};
+
 module.exports = {
   pool,
   initializeDatabase,
@@ -470,6 +497,9 @@ module.exports = {
   getProductByName,
   createProduct,
   updateProductStock,
+  updateProduct,
+  deleteProduct,
   createPurchaseInvoice,
   getPurchases,
+  getRecurringClients,
 };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -31,9 +31,55 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
   const [createError, setCreateError] = useState('');
   const [creating, setCreating] = useState(false);
 
+  const [recurringClients, setRecurringClients] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [filteredClients, setFilteredClients] = useState([]);
+
+  useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        const res = await authFetch('/api/invoices/clients');
+        if (res.ok) {
+          const data = await res.json();
+          setRecurringClients(data.clients || []);
+        }
+      } catch (err) {
+        console.error('Failed to load clients', err);
+      }
+    };
+    fetchClients();
+  }, [authFetch]);
+
   const handleCreateChange = e => {
     const { name, value } = e.target;
     setCreateForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleClientNameChange = (e) => {
+    const val = e.target.value;
+    setCreateForm(prev => ({ ...prev, clientName: val }));
+    if (val.trim().length > 0) {
+      const filtered = recurringClients.filter(c => 
+        c.name.toLowerCase().includes(val.toLowerCase())
+      );
+      setFilteredClients(filtered);
+      setShowSuggestions(true);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSelectClient = (client) => {
+    setCreateForm(prev => ({
+      ...prev,
+      clientName: client.name,
+      clientGst: client.gst || '',
+      clientAddress: client.address || '',
+      clientMobile: client.mobile || '',
+      clientState: client.state || '',
+      clientStateCode: client.stateCode || '',
+    }));
+    setShowSuggestions(false);
   };
 
   const handleItemChange = (index, field, value) => {
@@ -149,9 +195,49 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
                   <option value="debit_note">Debit Note</option>
                 </select>
               </div>
-              <div style={{ flex: '1 1 200px' }}>
+              <div style={{ flex: '1 1 200px', position: 'relative' }}>
                 <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Party Name *</label>
-                <input style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} name="clientName" value={createForm.clientName} onChange={handleCreateChange} placeholder="Acme Corporation" required />
+                <input 
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} 
+                  name="clientName" 
+                  value={createForm.clientName} 
+                  onChange={handleClientNameChange} 
+                  onFocus={() => {
+                    if (createForm.clientName.trim().length > 0) {
+                      const filtered = recurringClients.filter(c => 
+                        c.name.toLowerCase().includes(createForm.clientName.toLowerCase())
+                      );
+                      setFilteredClients(filtered);
+                      setShowSuggestions(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setShowSuggestions(false), 200);
+                  }}
+                  placeholder="Acme Corporation" 
+                  required 
+                  autoComplete="off"
+                />
+                {showSuggestions && filteredClients.length > 0 && (
+                  <>
+                    <style>{`
+                      .suggestion-item:hover { background-color: #f3f4f6; }
+                    `}</style>
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, boxShadow: '0 4px 6px rgba(0,0,0,0.1)', zIndex: 1000, marginTop: 4, maxHeight: 150, overflowY: 'auto' }}>
+                      {filteredClients.map((client, idx) => (
+                        <div 
+                          key={idx} 
+                          style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: idx < filteredClients.length - 1 ? '1px solid #f3f4f6' : 'none' }}
+                          onMouseDown={() => handleSelectClient(client)}
+                          className="suggestion-item"
+                        >
+                          <div style={{ fontWeight: 600, fontSize: 13, color: '#1f2937' }}>{client.name}</div>
+                          {client.gst && <div style={{ fontSize: 11, color: '#6b7280' }}>GSTIN: {client.gst}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
             
@@ -301,8 +387,10 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
                 <div style={{ flex: '1 1 200px' }}>
                   <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Template Style</label>
                   <select style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box', background: '#fff' }} name="templateStyle" value={createForm.templateStyle} onChange={handleCreateChange}>
-                    <option value="modern">Modern (Tabular)</option>
-                    <option value="standard">Standard (Simple)</option>
+                    <option value="modern">Modern (Default)</option>
+                    <option value="minimal">Minimalist (Monochrome)</option>
+                    <option value="classic">Classic (Dark Borders)</option>
+                    <option value="premium">Premium (Slate Theme)</option>
                   </select>
                 </div>
               )}
