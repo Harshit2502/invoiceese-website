@@ -21,6 +21,12 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/purchases/extract (Gemini Vision OCR)
+router.post('/extract', async (req, res) => {
+  try {
+    const { image, mimeType } = req.body;
+    if (!image) {
+      return res.status(400).json({ error: 'Image data is required' });
+    }
     let user = null;
     if (process.env.USE_POSTGRES === 'true') {
       const pgFunctions = require('../db-postgres');
@@ -88,6 +94,7 @@ router.post('/', async (req, res) => {
   if (process.env.USE_POSTGRES !== 'true') {
     return res.status(400).json({ error: 'Postgres required for purchases' });
   }
+  try {
     const { docType = 'purchase_invoice', supplier, invoiceNo, date, gst, items, subtotal, gstAmt, total } = req.body;
     
     if (!supplier || !total) {
