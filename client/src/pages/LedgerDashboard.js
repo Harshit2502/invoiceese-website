@@ -24,7 +24,7 @@ function Sidebar({ screen, setScreen, user, logout, isSidebarOpen, setIsSidebarO
     { icon: FileText, label: "All Documents", s: 1 },
     { icon: Upload, label: "Upload Invoice", s: 2 },
     { type: 'divider', label: 'Manage' },
-    { icon: Package, label: "Products & Stock", s: null },
+    { icon: Package, label: "Products & Stock", s: 4 },
     { icon: Settings, label: "Settings", s: 5 },
   ];
 
