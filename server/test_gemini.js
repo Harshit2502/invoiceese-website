@@ -1,18 +1,26 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 require('dotenv').config({ path: 'C:/Users/ASUS/OneDrive/Desktop/invoiceease/server/.env' });
 
+const fetch = require("node-fetch");
+require('dotenv').config({ path: 'C:/Users/ASUS/OneDrive/Desktop/invoiceease/server/.env' });
+
 async function test() {
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-    
-    const prompt = "Hello, respond in JSON: {\"status\": \"ok\"}";
-    
-    console.log("Calling gemini...");
-    const result = await model.generateContent([prompt]);
-    console.log("Result:", result.response.text());
+    const key = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.replace(/['"]/g, "").trim() : "";
+    console.log("Using API key:", key);
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
+    console.log("Status:", response.status);
+    console.log("Status text:", response.statusText);
+    const body = await response.text();
+    console.log("Body:", body);
   } catch (err) {
-    console.error("ERROR:", err);
+    console.error("Fetch Error:", err);
   }
 }
 

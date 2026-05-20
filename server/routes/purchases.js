@@ -85,7 +85,15 @@ router.post('/extract', async (req, res) => {
     res.json({ data: extractedData });
   } catch (error) {
     console.error('Error extracting invoice data:', error);
-    res.status(500).json({ error: 'Failed to extract invoice data. The image might be unreadable.' });
+    let errorMessage = 'Failed to extract invoice data. The image might be unreadable.';
+    if (error.message) {
+      if (error.message.includes('API key') || error.message.includes('key was reported as leaked') || error.message.includes('API_KEY')) {
+        errorMessage = 'Gemini API key error: The key is invalid or has been revoked (possibly leaked). Please check and update your GEMINI_API_KEY in the server\'s .env file.';
+      } else {
+        errorMessage = `Failed to extract invoice data: ${error.message}`;
+      }
+    }
+    res.status(500).json({ error: errorMessage });
   }
 });
 

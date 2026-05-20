@@ -27,8 +27,21 @@ const initializeDatabase = async () => {
       const migrationPath = path.join(__dirname, 'migrations', migration);
       if (fs.existsSync(migrationPath)) {
         const schema = fs.readFileSync(migrationPath, 'utf8');
-        await pool.query(schema);
-        console.log(`✅ Migration ${migration} executed`);
+        try {
+          await pool.query(schema);
+          console.log(`✅ Migration ${migration} executed`);
+        } catch (err) {
+          if (
+            err.message.includes('already exists') ||
+            err.message.includes('duplicate key value') ||
+            err.message.includes('already a member')
+          ) {
+            console.log(`⚠️ Migration ${migration} skipped (objects already exist)`);
+          } else {
+            console.error(`❌ Migration ${migration} failed:`, err.message);
+            throw err;
+          }
+        }
       }
     }
     
