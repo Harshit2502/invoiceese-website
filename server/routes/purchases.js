@@ -37,8 +37,8 @@ router.post('/extract', async (req, res) => {
 
     const { GoogleGenerativeAI } = require("@google/generative-ai");
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // Use gemini-1.5-flash for free tier vision OCR tasks
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // Use gemini-2.5-flash which is the active free-tier model for multimodal tasks
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `
       You are an expert OCR and data extraction tool. Analyze this document. 
