@@ -2,13 +2,15 @@ const express = require('express');
 const router = express.Router();
 const authenticateToken = require('../middleware/auth');
 const { v4: uuidv4 } = require('uuid');
+const db = require('../db');
 
 router.use(authenticateToken);
 
 // GET /api/products
 router.get('/', async (req, res) => {
   if (process.env.USE_POSTGRES !== 'true') {
-    return res.json({ products: [] }); // In-memory fallback not fully implemented for products
+    const products = db.products ? db.products.filter(p => p.userId === req.userId) : [];
+    return res.json({ products });
   }
   try {
     const pgFunctions = require('../db-postgres');
@@ -23,7 +25,28 @@ router.get('/', async (req, res) => {
 // POST /api/products
 router.post('/', async (req, res) => {
   if (process.env.USE_POSTGRES !== 'true') {
-    return res.status(400).json({ error: 'Postgres required for products' });
+    try {
+      const { name, sku, stockQty, avgCost, sellingPrice } = req.body;
+      if (!name) return res.status(400).json({ error: 'Product name is required' });
+
+      if (!db.products) db.products = [];
+      const product = {
+        id: uuidv4(),
+        userId: req.userId,
+        name: String(name).trim(),
+        sku: String(sku || '').trim(),
+        stockQty: Number(stockQty) || 0,
+        avgCost: Number(avgCost) || 0,
+        sellingPrice: Number(sellingPrice) || 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.products.push(product);
+      return res.status(201).json({ product });
+    } catch (error) {
+      console.error('Error creating product in-memory:', error);
+      return res.status(500).json({ error: 'Failed to create product' });
+    }
   }
   try {
     const { name, sku, stockQty, avgCost, sellingPrice } = req.body;

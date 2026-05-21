@@ -5,6 +5,8 @@ const bcrypt = require('bcryptjs');
 const db = {
   users: [],
   invoices: [],
+  purchases: [],
+  products: [],
 };
 
 // Seed a demo user

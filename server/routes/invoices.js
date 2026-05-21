@@ -64,7 +64,45 @@ router.use(authMiddleware);
 // GET /api/invoices/clients - fetch recurring clients
 router.get('/clients', async (req, res) => {
   if (process.env.USE_POSTGRES !== 'true') {
-    return res.json({ clients: [] });
+    try {
+      const docs = [
+        ...(db.invoices || []).filter(inv => inv.userId === req.userId),
+        ...(db.purchases || []).filter(pur => pur.userId === req.userId)
+      ];
+      // Find customer/supplier name frequency
+      const counts = {};
+      docs.forEach(doc => {
+        const name = doc.clientName || doc.partyName || doc.supplierName || '';
+        if (name) {
+          counts[name] = (counts[name] || 0) + 1;
+        }
+      });
+
+      // Filter names with count >= 2
+      const recurringNames = Object.keys(counts).filter(name => counts[name] >= 2);
+
+      // Get the most recent details for each recurring name
+      const clients = recurringNames.map(name => {
+        const sortedDocsForName = docs
+          .filter(doc => (doc.clientName || doc.partyName || doc.supplierName || '').toLowerCase() === name.toLowerCase())
+          .sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
+        
+        const latest = sortedDocsForName[0];
+        return {
+          name,
+          gst: latest.clientGst || latest.partyGst || latest.supplierGst || '',
+          address: latest.clientAddress || latest.partyAddress || '',
+          mobile: latest.clientMobile || latest.partyMobile || '',
+          state: latest.clientState || latest.partyState || '',
+          stateCode: latest.clientStateCode || latest.partyStateCode || ''
+        };
+      });
+
+      return res.json({ clients });
+    } catch (err) {
+      console.error('Error fetching recurring clients (in-memory):', err);
+      return res.json({ clients: [] });
+    }
   }
   try {
     const pgFunctions = require('../db-postgres');
@@ -195,6 +233,32 @@ router.post('/', async (req, res) => {
         } else if (docType === 'credit_note') {
           await pgFunctions.updateProductStock(productId, quantity);
         }
+      } else {
+        if (!db.products) db.products = [];
+        let product = db.products.find(p => p.userId === req.userId && p.name && description && p.name.toLowerCase() === description.toLowerCase());
+        if (!product) {
+          product = {
+            id: uuidv4(),
+            userId: req.userId,
+            name: description,
+            sku: String(item.hsn || '').trim(),
+            stockQty: 0,
+            avgCost: unitPrice,
+            sellingPrice: unitPrice,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          db.products.push(product);
+        }
+        productId = product.id;
+        
+        // Update stock based on docType
+        if (['sales_invoice', 'delivery_challan'].includes(docType)) {
+          product.stockQty -= quantity;
+        } else if (docType === 'credit_note') {
+          product.stockQty += quantity;
+        }
+        product.updatedAt = new Date().toISOString();
       }
 
       let lineTotal = quantity * unitPrice;
@@ -242,6 +306,27 @@ router.post('/', async (req, res) => {
       }
       productId = product.id;
       await pgFunctions.updateProductStock(productId, -1);
+    } else {
+      if (!db.products) db.products = [];
+      const { v4: uuidv4 } = require('uuid');
+      let product = db.products.find(p => p.userId === req.userId && p.name && fallbackService && p.name.toLowerCase() === fallbackService.toLowerCase());
+      if (!product) {
+        product = {
+          id: uuidv4(),
+          userId: req.userId,
+          name: fallbackService,
+          sku: '',
+          stockQty: 0,
+          avgCost: fallbackAmount,
+          sellingPrice: fallbackAmount,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        db.products.push(product);
+      }
+      productId = product.id;
+      product.stockQty -= 1;
+      product.updatedAt = new Date().toISOString();
     }
 
     normalizedItems.push({

@@ -1,0 +1,5 @@
+Hello! This file was created by your AI assistant, Antigravity.
+
+If you see this file in your code editor, it means our connection is working perfectly!
+
+You can delete this file anytime.

@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 
@@ -17,10 +18,12 @@ if (process.env.USE_POSTGRES === 'true' && (process.env.DATABASE_URL || process.
     initializeDatabase().then(() => {
       console.log('📦 PostgreSQL database ready');
     }).catch(err => {
-      console.warn('⚠️ PostgreSQL unavailable, using in-memory database:', err.message);
+      console.warn('⚠️ PostgreSQL unavailable, disabling it and using in-memory database:', err.message);
+      process.env.USE_POSTGRES = 'false';
     });
   } catch (err) {
-    console.warn('⚠️ PostgreSQL module not available, using in-memory database');
+    console.warn('⚠️ PostgreSQL module not available, disabling it and using in-memory database');
+    process.env.USE_POSTGRES = 'false';
   }
 }
 
@@ -51,7 +54,7 @@ app.get('/api/pdf/:id', async (req, res) => {
 
   const fs = require('fs');
   const path = require('path');
-  const pdfPath = path.join(__dirname, '..', 'pdfs', `${invoice.invoiceNumber}.pdf`);
+  const pdfPath = path.join(__dirname, '..', 'pdfs', `${invoice.id}.pdf`);
 
   if (!fs.existsSync(pdfPath)) {
     return res.status(404).json({ error: 'PDF not found. Please regenerate the invoice.' });

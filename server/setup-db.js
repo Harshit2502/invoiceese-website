@@ -18,7 +18,7 @@ const { exec } = require('child_process');
 const util = require('util');
 const execAsync = util.promisify(exec);
 
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const DB_USER = process.env.DB_USER || 'postgres';
 const DB_HOST = process.env.DB_HOST || 'localhost';

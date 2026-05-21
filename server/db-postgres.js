@@ -68,6 +68,11 @@ const dbExecute = async (text, params) => {
   return result.rowCount;
 };
 
+const isValidUUID = (id) => {
+  if (typeof id !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+};
+
 // USER FUNCTIONS
 const createUser = async (userData) => {
   const { id, email, whatsapp, passwordHash, businessName, gstNumber, panNumber, address, city, pincode, state, stateCode, bankName, accountNumber, ifscCode, upiId, logoUrl, templateStyle, showWatermark } = userData;
@@ -89,6 +94,7 @@ const getUserByEmail = async (email) => {
 };
 
 const getUserById = async (id) => {
+  if (!isValidUUID(id)) return null;
   return dbQuerySingle(
     `SELECT id, email, whatsapp, password_hash as "passwordHash", business_name as "businessName", gst_number as "gstNumber", pan_number as "panNumber", address, city, pincode, state, state_code as "stateCode", bank_name as "bankName", account_number as "accountNumber", ifsc_code as "ifscCode", upi_id as "upiId", plan, invoices_this_month as "invoicesThisMonth", logo_url as "logoUrl", template_style as "templateStyle", show_watermark as "showWatermark", telegram_chat_id, created_at as "createdAt" FROM users WHERE id = $1`,
     [id]
@@ -103,7 +109,8 @@ const getUserByWhatsApp = async (whatsapp) => {
 };
 
 const updateUser = async (userId, updates) => {
-const allowedFields = ['business_name', 'gst_number', 'pan_number', 'address', 'city', 'pincode', 'state', 'state_code', 'bank_name', 'account_number', 'ifsc_code', 'upi_id', 'plan', 'invoices_this_month', 'logo_url', 'template_style', 'show_watermark', 'telegram_chat_id', 'whatsapp'];
+  if (!isValidUUID(userId)) return null;
+  const allowedFields = ['business_name', 'gst_number', 'pan_number', 'address', 'city', 'pincode', 'state', 'state_code', 'bank_name', 'account_number', 'ifsc_code', 'upi_id', 'plan', 'invoices_this_month', 'logo_url', 'template_style', 'show_watermark', 'telegram_chat_id', 'whatsapp'];
   
   // Convert camelCase to snake_case for DB fields if needed
   const mappedUpdates = {};
@@ -128,6 +135,7 @@ const allowedFields = ['business_name', 'gst_number', 'pan_number', 'address', '
 };
 
 const updateUserPassword = async (userId, newPasswordHash) => {
+  if (!isValidUUID(userId)) return null;
   const result = await pool.query(
     `UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2 RETURNING id`,
     [newPasswordHash, userId]
@@ -150,10 +158,12 @@ const createDocument = async (docData) => {
 };
 
 const getDocumentById = async (id) => {
+  if (!isValidUUID(id)) return null;
   return dbQuerySingle(`SELECT * FROM documents WHERE id = $1`, [id]);
 };
 
 const getUserDocuments = async (userId, docType) => {
+  if (!isValidUUID(userId)) return [];
   if (docType) {
     return dbQuery(`SELECT * FROM documents WHERE user_id = $1 AND doc_type = $2 ORDER BY created_at DESC`, [userId, docType]);
   }
@@ -161,6 +171,7 @@ const getUserDocuments = async (userId, docType) => {
 };
 
 const updateDocumentStatus = async (id, status, paymentDetails = null) => {
+  if (!isValidUUID(id)) return null;
   if (paymentDetails) {
     const result = await pool.query(
       `UPDATE documents SET status = $1, payment_details = $2::jsonb, updated_at = NOW() WHERE id = $3 RETURNING *`,
@@ -177,15 +188,28 @@ const updateDocumentStatus = async (id, status, paymentDetails = null) => {
 };
 
 const updateDocumentPdfUrl = async (id, pdfUrl) => {
+  if (!isValidUUID(id)) return null;
   const result = await pool.query(`UPDATE documents SET pdf_url = $1, updated_at = NOW() WHERE id = $2 RETURNING *`, [pdfUrl, id]);
   return result.rows[0];
 };
 
 const deleteDocument = async (id) => {
+  if (!isValidUUID(id)) return 0;
   return dbExecute(`DELETE FROM documents WHERE id = $1`, [id]);
 };
 
 const getNextDocNumber = async (userId, docType) => {
+  if (!isValidUUID(userId)) {
+    const prefixMap = { 
+      'sales_invoice': 'INV-', 
+      'purchase_invoice': 'PI-', 
+      'credit_note': 'CN-',
+      'debit_note': 'DN-',
+      'provisional_invoice': 'PROV-',
+      'delivery_challan': 'DC-'
+    };
+    return `${prefixMap[docType] || 'DOC-'}001`;
+  }
   const result = await dbQuerySingle(
     `SELECT doc_number FROM documents WHERE user_id = $1 AND doc_type = $2 ORDER BY created_at DESC LIMIT 1`,
     [userId, docType]
@@ -293,7 +317,10 @@ const getInvoiceById = async (invoiceId) => {
 };
 
 const getUserInvoices = async (userId) => {
-  const docs = await getUserDocuments(userId, 'sales_invoice');
+  const docs = await dbQuery(
+    `SELECT * FROM documents WHERE user_id = $1 AND doc_type != 'purchase_invoice' ORDER BY created_at DESC`,
+    [userId]
+  );
   return docs.map(mapDocToInvoice);
 };
 
@@ -356,6 +383,7 @@ const resetConversation = async (whatsappNumber) => {
 
 // PRODUCT FUNCTIONS
 const getProducts = async (userId) => {
+  if (!isValidUUID(userId)) return [];
   return dbQuery(
     `SELECT id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice", created_at as "createdAt", updated_at as "updatedAt" FROM products WHERE user_id = $1 ORDER BY name ASC`,
     [userId]
@@ -363,6 +391,7 @@ const getProducts = async (userId) => {
 };
 
 const getProductById = async (productId) => {
+  if (!isValidUUID(productId)) return null;
   return dbQuerySingle(
     `SELECT id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice", created_at as "createdAt", updated_at as "updatedAt" FROM products WHERE id = $1`,
     [productId]
@@ -370,6 +399,7 @@ const getProductById = async (productId) => {
 };
 
 const getProductByName = async (userId, name) => {
+  if (!isValidUUID(userId)) return null;
   return dbQuerySingle(
     `SELECT id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice" FROM products WHERE user_id = $1 AND LOWER(name) = LOWER($2)`,
     [userId, name]
@@ -388,6 +418,7 @@ const createProduct = async (productData) => {
 };
 
 const updateProductStock = async (productId, qtyChange, newAvgCost = null) => {
+  if (!isValidUUID(productId)) return;
   if (newAvgCost !== null) {
     await dbExecute(
       `UPDATE products SET stock_qty = stock_qty + $1, avg_cost = $2, updated_at = NOW() WHERE id = $3`,
@@ -443,11 +474,13 @@ const createPurchaseInvoice = async (purchaseData) => {
 };
 
 const getPurchases = async (userId) => {
+  if (!isValidUUID(userId)) return [];
   const docs = await getUserDocuments(userId, 'purchase_invoice');
   return docs.map(mapDocToPurchase);
 };
 
 const getRecurringClients = async (userId) => {
+  if (!isValidUUID(userId)) return [];
   return dbQuery(
     `SELECT party_name as "name", party_gst as "gst", party_address as "address", party_mobile as "mobile", party_state as "state", party_state_code as "stateCode" 
      FROM (
@@ -464,6 +497,7 @@ const getRecurringClients = async (userId) => {
 };
 
 const updateProduct = async (productId, { name, sku, stockQty, avgCost, sellingPrice }) => {
+  if (!isValidUUID(productId)) return null;
   return dbQuerySingle(
     `UPDATE products SET name = $1, sku = $2, stock_qty = $3, avg_cost = $4, selling_price = $5, updated_at = NOW() WHERE id = $6 RETURNING id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice"`,
     [name, sku, Number(stockQty) || 0, Number(avgCost) || 0, Number(sellingPrice) || 0, productId]
@@ -471,6 +505,7 @@ const updateProduct = async (productId, { name, sku, stockQty, avgCost, sellingP
 };
 
 const deleteProduct = async (productId) => {
+  if (!isValidUUID(productId)) return 0;
   return dbExecute(`DELETE FROM products WHERE id = $1`, [productId]);
 };
 

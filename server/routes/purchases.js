@@ -2,13 +2,15 @@ const express = require('express');
 const router = express.Router();
 const authenticateToken = require('../middleware/auth');
 const { v4: uuidv4 } = require('uuid');
+const db = require('../db');
 
 router.use(authenticateToken);
 
 // GET /api/purchases
 router.get('/', async (req, res) => {
   if (process.env.USE_POSTGRES !== 'true') {
-    return res.json({ purchases: [] });
+    const purchases = db.purchases ? db.purchases.filter(p => p.userId === req.userId) : [];
+    return res.json({ purchases });
   }
   try {
     const pgFunctions = require('../db-postgres');
@@ -100,7 +102,159 @@ router.post('/extract', async (req, res) => {
 // POST /api/purchases
 router.post('/', async (req, res) => {
   if (process.env.USE_POSTGRES !== 'true') {
-    return res.status(400).json({ error: 'Postgres required for purchases' });
+    try {
+      const { docType = 'purchase_invoice', supplier, invoiceNo, date, gst, items, subtotal, gstAmt, total } = req.body;
+      
+      if (!supplier || !total) {
+        return res.status(400).json({ error: 'Supplier/Client and total are required' });
+      }
+
+      if (!db.purchases) db.purchases = [];
+      if (!db.products) db.products = [];
+      if (!db.invoices) db.invoices = [];
+
+      const invoiceId = uuidv4();
+      let processedItems = [];
+
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          if (!item) continue;
+          const itemName = String(item.name || '').trim() || 'Unnamed Product';
+          let productId = null;
+          let product = db.products.find(p => p.userId === req.userId && p.name && p.name.toLowerCase() === itemName.toLowerCase());
+          
+          if (!product) {
+            product = {
+              id: uuidv4(),
+              userId: req.userId,
+              name: itemName,
+              sku: '',
+              stockQty: 0,
+              avgCost: Number(item.unit) || 0,
+              sellingPrice: (Number(item.unit) || 0) * 1.3,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+            db.products.push(product);
+          }
+          
+          productId = product.id;
+          const newQty = Number(item.qty) || 0;
+          const currentQty = product.stockQty || 0;
+          const currentCost = product.avgCost || 0;
+          const itemCost = Number(item.unit) || 0;
+          
+          if (docType === 'purchase_invoice') {
+            const totalNewQty = currentQty + newQty;
+            const newAvgCost = totalNewQty > 0 
+              ? ((currentQty * currentCost) + (newQty * itemCost)) / totalNewQty 
+              : itemCost;
+            
+            product.stockQty = totalNewQty;
+            product.avgCost = Number(newAvgCost.toFixed(2));
+          } else if (docType === 'credit_note') {
+            product.stockQty = currentQty + newQty;
+          } else {
+            product.stockQty = currentQty - newQty;
+          }
+          product.updatedAt = new Date().toISOString();
+          
+          processedItems.push({
+            productId,
+            description: itemName,
+            quantity: newQty,
+            unitPrice: itemCost,
+            amount: Number(item.total) || (newQty * itemCost)
+          });
+        }
+      }
+
+      let resultDoc;
+      if (docType === 'purchase_invoice') {
+        resultDoc = {
+          id: invoiceId,
+          userId: req.userId,
+          supplierName: supplier,
+          supplierGst: gst || '',
+          invoiceNumber: invoiceNo || `PI-${Date.now()}`,
+          invoiceDate: date || new Date().toISOString().split('T')[0],
+          total: Number(total),
+          subtotal: Number(subtotal),
+          gstAmount: Number(gstAmt),
+          status: 'Verified',
+          items: processedItems,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        db.purchases.push(resultDoc);
+      } else {
+        const requestedTemplateStyle = 'modern';
+        const calculatedGstType = 'intrastate';
+        const parsedAmount = Number(subtotal);
+        const parsedGstRate = subtotal > 0 ? Math.round((Number(gstAmt) * 100) / Number(subtotal)) : 0;
+
+        const doc = {
+          id: invoiceId,
+          userId: req.userId,
+          docType,
+          direction: 'outbound',
+          invoiceNumber: invoiceNo || `INV-${Date.now()}`,
+          clientName: supplier,
+          clientGst: gst || '',
+          clientAddress: '',
+          clientMobile: '',
+          clientState: '',
+          clientStateCode: '',
+          reverseCharge: false,
+          transportMode: '',
+          vehicleNumber: '',
+          dateOfSupply: '',
+          placeOfSupply: '',
+          service: processedItems[0]?.description || 'Service',
+          items: processedItems,
+          amount: parsedAmount,
+          gstRate: parsedGstRate,
+          gstAmount: Number(gstAmt),
+          cgst: parsedGstRate > 0 ? Number(((parsedAmount * parsedGstRate) / 100 / 2).toFixed(2)) : 0,
+          sgst: parsedGstRate > 0 ? Number(((parsedAmount * parsedGstRate) / 100 / 2).toFixed(2)) : 0,
+          igst: 0,
+          gstType: calculatedGstType,
+          totalAmount: Number(total),
+          notes: '',
+          dueDate: null,
+          status: 'unpaid',
+          date: date || new Date().toISOString().split('T')[0],
+          createdAt: new Date().toISOString(),
+          templateStyle: requestedTemplateStyle,
+          showWatermark: true
+        };
+
+        // Generate PDF URL for the outbound document
+        let pdfUrl = null;
+        try {
+          const { generateInvoicePDF } = require('../pdf-generator');
+          const userMeta = db.users.find(u => u.id === req.userId) || {};
+          const pdfPayload = {
+            ...doc,
+            subtotal: parsedAmount,
+            gstApplicable: parsedGstRate > 0,
+          };
+          await generateInvoicePDF(pdfPayload, userMeta);
+          pdfUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/pdf/${invoiceId}`;
+        } catch (err) {
+          console.error('Failed to generate OCR outbound PDF (in-memory):', err);
+        }
+
+        doc.pdfUrl = pdfUrl;
+        db.invoices.push(doc);
+        resultDoc = doc;
+      }
+
+      return res.status(201).json({ purchase: resultDoc });
+    } catch (error) {
+      console.error('Error saving purchase (in-memory):', error);
+      return res.status(500).json({ error: 'Failed to save purchase invoice' });
+    }
   }
   try {
     const { docType = 'purchase_invoice', supplier, invoiceNo, date, gst, items, subtotal, gstAmt, total } = req.body;
@@ -118,14 +272,16 @@ router.post('/', async (req, res) => {
       let processedItems = [];
       if (Array.isArray(items)) {
         for (const item of items) {
+          if (!item) continue;
+          const itemName = String(item.name || '').trim() || 'Unnamed Product';
           let productId = null;
-          let product = await pgFunctions.getProductByName(req.userId, item.name);
+          let product = await pgFunctions.getProductByName(req.userId, itemName);
           
           if (!product) {
             product = await pgFunctions.createProduct({
               id: uuidv4(),
               userId: req.userId,
-              name: item.name,
+              name: itemName,
               stockQty: 0,
               avgCost: Number(item.unit) || 0,
               sellingPrice: (Number(item.unit) || 0) * 1.3
@@ -134,8 +290,8 @@ router.post('/', async (req, res) => {
           
           productId = product.id;
           const newQty = Number(item.qty) || 0;
-          const currentQty = product.stockQty || 0;
-          const currentCost = product.avgCost || 0;
+          const currentQty = Number(product.stockQty) || 0;
+          const currentCost = Number(product.avgCost) || 0;
           const itemCost = Number(item.unit) || 0;
           
           const totalNewQty = currentQty + newQty;
@@ -147,7 +303,7 @@ router.post('/', async (req, res) => {
           
           processedItems.push({
             productId,
-            description: item.name,
+            description: itemName,
             quantity: newQty,
             unitPrice: itemCost,
             amount: Number(item.total) || (newQty * itemCost)
@@ -161,7 +317,7 @@ router.post('/', async (req, res) => {
         supplierName: supplier,
         supplierGst: gst,
         invoiceNumber: invoiceNo,
-        invoiceDate: date,
+        invoiceDate: date || new Date().toISOString().split('T')[0],
         total: Number(total),
         subtotal: Number(subtotal),
         gstAmount: Number(gstAmt),
@@ -173,14 +329,16 @@ router.post('/', async (req, res) => {
       let processedItems = [];
       if (Array.isArray(items)) {
         for (const item of items) {
+          if (!item) continue;
+          const itemName = String(item.name || '').trim() || 'Unnamed Product';
           let productId = null;
-          let product = await pgFunctions.getProductByName(req.userId, item.name);
+          let product = await pgFunctions.getProductByName(req.userId, itemName);
           
           if (!product) {
             product = await pgFunctions.createProduct({
               id: uuidv4(),
               userId: req.userId,
-              name: item.name,
+              name: itemName,
               stockQty: 0,
               avgCost: Number(item.unit) || 0,
               sellingPrice: Number(item.unit) || 0
@@ -197,7 +355,7 @@ router.post('/', async (req, res) => {
           
           processedItems.push({
             productId,
-            description: item.name,
+            description: itemName,
             quantity: qty,
             unitPrice: Number(item.unit) || 0,
             amount: Number(item.total) || (qty * (Number(item.unit) || 0))
@@ -217,7 +375,7 @@ router.post('/', async (req, res) => {
           invoiceNumber: invoiceNo,
           clientName: supplier,
           clientGst: gst,
-          date,
+          date: date || new Date().toISOString().split('T')[0],
           items: processedItems,
           amount: Number(subtotal),
           gstRate: subtotal > 0 ? Math.round((Number(gstAmt) * 100) / Number(subtotal)) : 0,
@@ -237,7 +395,7 @@ router.post('/', async (req, res) => {
         userId: req.userId,
         docType,
         direction: 'outbound',
-        docNumber: invoiceNo,
+        docNumber: invoiceNo || `INV-${Date.now()}`,
         partyName: supplier,
         partyGst: gst,
         items: processedItems,
@@ -245,7 +403,7 @@ router.post('/', async (req, res) => {
         gstRate: subtotal > 0 ? Math.round((Number(gstAmt) * 100) / Number(subtotal)) : 0,
         gstAmount: Number(gstAmt),
         total: Number(total),
-        docDate: date,
+        docDate: date || new Date().toISOString().split('T')[0],
         pdfUrl,
         status: 'unpaid'
       });
