@@ -16,6 +16,40 @@ import "./LedgerDashboard.css";
 const T = "#0F6E56";
 const TL = "#E1F5EE";
 
+const safeFormatDate = (dateVal) => {
+  if (!dateVal) return 'N/A';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return 'N/A';
+  try {
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  } catch (e) {
+    return 'N/A';
+  }
+};
+
+const safeGetTime = (dateVal) => {
+  if (!dateVal) return 0;
+  const d = new Date(dateVal);
+  return isNaN(d.getTime()) ? 0 : d.getTime();
+};
+
+const standardizeDateForInput = (dateStr) => {
+  if (!dateStr) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    return d.toISOString().split('T')[0];
+  }
+  const parts = String(dateStr).match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (parts) {
+    const day = parts[1].padStart(2, '0');
+    const month = parts[2].padStart(2, '0');
+    const year = parts[3];
+    return `${year}-${month}-${day}`;
+  }
+  return '';
+};
+
 function Sidebar({ screen, setScreen, user, logout, isSidebarOpen, setIsSidebarOpen }) {
   const nav = [
     { icon: LayoutDashboard, label: "Dashboard", s: 0 },
@@ -24,7 +58,7 @@ function Sidebar({ screen, setScreen, user, logout, isSidebarOpen, setIsSidebarO
     { icon: FileText, label: "All Documents", s: 1 },
     { icon: Upload, label: "Upload Invoice", s: 2 },
     { type: 'divider', label: 'Manage' },
-    { icon: Package, label: "Products & Stock", s: 4 },
+    { icon: Package, label: "Products & Stock", s: 6 },
     { icon: Settings, label: "Settings", s: 5 },
   ];
 
@@ -90,7 +124,7 @@ function BottomNav({ screen, setScreen, setShowCreate }) {
     { icon: FileText, label: "Docs", s: 1 },
     { icon: Upload, label: "Upload", s: 2 },
     { icon: BarChart2, label: "Stats", s: 4 },
-    { icon: Package, label: "Stocks", s: null },
+    { icon: Package, label: "Stocks", s: 6 },
   ];
 
   return (
@@ -238,11 +272,11 @@ function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoi
       type: inv.docType || 'sales_invoice',
       no: inv.invoiceNumber,
       party: inv.clientName,
-      date: new Date(inv.date || inv.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+      date: safeFormatDate(inv.date || inv.createdAt),
       amount: `₹${Number(inv.totalAmount || inv.amount).toLocaleString()}`,
       status: inv.status === 'paid' ? 'Paid' : 'Pending',
       url: inv.pdfUrl,
-      ts: new Date(inv.createdAt).getTime()
+      ts: safeGetTime(inv.createdAt || inv.date)
     }));
 
     const p = purchases.map(inv => ({
@@ -251,11 +285,11 @@ function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoi
       type: 'purchase_invoice',
       no: inv.invoiceNumber,
       party: inv.supplierName,
-      date: new Date(inv.invoiceDate || inv.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+      date: safeFormatDate(inv.invoiceDate || inv.createdAt),
       amount: `₹${Number(inv.total).toLocaleString()}`,
       status: inv.status,
       url: inv.pdfUrl,
-      ts: new Date(inv.createdAt).getTime()
+      ts: safeGetTime(inv.createdAt || inv.invoiceDate)
     }));
 
     return [...s, ...p].sort((a, b) => b.ts - a.ts);
@@ -596,12 +630,12 @@ function UploadInvoice({ setScreen, authFetch, setExtractedData, setExtractedIma
   );
 }
 
-function ReviewExtraction({ setScreen, extractedData, extractedImage, authFetch, fetchPurchases, fetchProducts }) {
+function ReviewExtraction({ setScreen, extractedData, extractedImage, authFetch, fetchInvoices, fetchPurchases, fetchProducts }) {
   const [form, setForm] = useState({
     docType: extractedData?.docType || 'purchase_invoice',
     supplier: extractedData?.supplier || '',
     invoiceNo: extractedData?.invoiceNo || '',
-    date: extractedData?.date || '',
+    date: standardizeDateForInput(extractedData?.date) || new Date().toISOString().split('T')[0],
     gst: extractedData?.gst || '',
     items: extractedData?.items || [],
     subtotal: extractedData?.subtotal || 0,
@@ -682,8 +716,9 @@ function ReviewExtraction({ setScreen, extractedData, extractedImage, authFetch,
       });
       if (res.ok) {
         setSaved(true);
-        fetchPurchases();
-        fetchProducts();
+        if (typeof fetchInvoices === 'function') fetchInvoices();
+        if (typeof fetchPurchases === 'function') fetchPurchases();
+        if (typeof fetchProducts === 'function') fetchProducts();
         setTimeout(() => setScreen(1), 1000); // Redirect to Invoice Hub
       } else {
         const data = await res.json();
@@ -949,6 +984,408 @@ function Analytics({ products, stats, handleExportCSV }) {
   );
 }
 
+function ProductsStockManager({ products, authFetch, fetchProducts, handleExportCSV }) {
+  const [search, setSearch] = useState('');
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalForm, setModalForm] = useState({
+    name: '',
+    sku: '',
+    stockQty: 0,
+    avgCost: 0,
+    sellingPrice: 0,
+    hsnCode: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const matchesSearch = 
+        String(p.name || '').toLowerCase().includes(search.toLowerCase()) ||
+        String(p.sku || '').toLowerCase().includes(search.toLowerCase()) ||
+        String(p.hsnCode || '').toLowerCase().includes(search.toLowerCase());
+      
+      const matchesLowStock = !showLowStockOnly || (Number(p.stockQty) <= 6);
+      return matchesSearch && matchesLowStock;
+    });
+  }, [products, search, showLowStockOnly]);
+
+  const stats = useMemo(() => {
+    let totalValue = 0;
+    let lowStockCount = 0;
+    let totalProfitPotential = 0;
+
+    products.forEach(p => {
+      const qty = Number(p.stockQty) || 0;
+      const cost = Number(p.avgCost) || 0;
+      const sell = Number(p.sellingPrice) || 0;
+
+      totalValue += qty * cost;
+      if (qty <= 6) lowStockCount++;
+      totalProfitPotential += qty * Math.max(0, sell - cost);
+    });
+
+    return {
+      totalValue,
+      lowStockCount,
+      totalProfitPotential,
+      totalSKUs: products.length
+    };
+  }, [products]);
+
+  const openAddModal = () => {
+    setEditingProduct(null);
+    setModalForm({
+      name: '',
+      sku: '',
+      stockQty: 0,
+      avgCost: 0,
+      sellingPrice: 0,
+      hsnCode: ''
+    });
+    setError(null);
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (product) => {
+    setEditingProduct(product);
+    setModalForm({
+      name: product.name || '',
+      sku: product.sku || '',
+      stockQty: product.stockQty || 0,
+      avgCost: product.avgCost || 0,
+      sellingPrice: product.sellingPrice || 0,
+      hsnCode: product.hsnCode || ''
+    });
+    setError(null);
+    setIsModalOpen(true);
+  };
+
+  const handleModalSubmit = async (e) => {
+    e.preventDefault();
+    if (!modalForm.name.trim()) {
+      setError("Product Name is required");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+
+    const isEdit = !!editingProduct;
+    const url = isEdit ? `/api/products/${editingProduct.id}` : `/api/products`;
+    const method = isEdit ? 'PUT' : 'POST';
+
+    try {
+      const res = await authFetch(url, {
+        method,
+        body: JSON.stringify({
+          name: modalForm.name.trim(),
+          sku: modalForm.sku.trim(),
+          stockQty: Number(modalForm.stockQty) || 0,
+          avgCost: Number(modalForm.avgCost) || 0,
+          sellingPrice: Number(modalForm.sellingPrice) || 0,
+          hsnCode: modalForm.hsnCode.trim() || null
+        })
+      });
+
+      if (res.ok) {
+        setIsModalOpen(false);
+        fetchProducts();
+      } else {
+        const errData = await res.json();
+        setError(errData.error || 'Failed to save product');
+      }
+    } catch (err) {
+      setError(err.message || 'Server error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (productId) => {
+    if (!window.confirm("Are you sure you want to delete this product from stock?")) return;
+    try {
+      const res = await authFetch(`/api/products/${productId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        fetchProducts();
+      } else {
+        const errData = await res.json();
+        alert(errData.error || 'Failed to delete product');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error');
+    }
+  };
+
+  return (
+    <div className="screen active" id="screen-products-stock">
+      <div className="section-header">
+        <div>
+          <div className="section-title">Products & Stock Manager</div>
+          <div className="section-sub">Manage inventory item profiles, HSN codes, cost valuation, and prices</div>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn btn-ghost" onClick={() => handleExportCSV('stocks')} style={{ gap: 6, display: 'flex', alignItems: 'center', background: '#eef2ff', color: '#4f46e5', border: '1px solid #c7d2fe', padding: '8px 12px', fontSize: 13, borderRadius: 8, fontWeight: 600 }}>
+            <Download size={14} /> Export Stocks
+          </button>
+          <button className="btn btn-primary" onClick={openAddModal}>
+            <Plus size={14} /> Add Product
+          </button>
+        </div>
+      </div>
+
+      <div className="stats-grid" style={{ marginBottom: 20 }}>
+        <div className="stat-card" style={{ borderLeft: '4px solid var(--green)' }}>
+          <div className="stat-label">Stock Valuation</div>
+          <div className="stat-value">₹{stats.totalValue.toLocaleString()}</div>
+          <div className="stat-delta">Asset value at cost price</div>
+        </div>
+        <div className="stat-card" style={{ borderLeft: '4px solid #3b82f6' }}>
+          <div className="stat-label">Active SKUs</div>
+          <div className="stat-value">{stats.totalSKUs}</div>
+          <div className="stat-delta">Total catalog items</div>
+        </div>
+        <div className="stat-card" style={{ borderLeft: stats.lowStockCount > 0 ? '4px solid #ef4444' : '4px solid var(--green)' }}>
+          <div className="stat-label">Low / Out of Stock</div>
+          <div className="stat-value" style={{ color: stats.lowStockCount > 0 ? '#ef4444' : 'inherit' }}>{stats.lowStockCount}</div>
+          <div className="stat-delta">Items with &le; 6 units left</div>
+        </div>
+        <div className="stat-card" style={{ borderLeft: '4px solid #eab308' }}>
+          <div className="stat-label">Margin Profit Potential</div>
+          <div className="stat-value">₹{stats.totalProfitPotential.toLocaleString()}</div>
+          <div className="stat-delta">Expected profit on sell-out</div>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 16, marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: 8, flex: 1, minWidth: 260 }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <input 
+                placeholder="Search by product name, SKU, or HSN Code..." 
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ width: '100%', border: '1px solid var(--border)', padding: '8px 12px', paddingLeft: 34, borderRadius: 8, fontSize: 13, outline: 'none' }}
+              />
+              <Search size={14} color="#9ca3af" style={{ position: 'absolute', left: 12, top: 12 }} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', color: 'var(--ink2)' }}>
+              <input 
+                type="checkbox" 
+                checked={showLowStockOnly}
+                onChange={e => setShowLowStockOnly(e.target.checked)}
+                style={{ width: 16, height: 16, cursor: 'pointer' }}
+              />
+              Show Low Stock Only (&le; 6)
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <table className="inv-table">
+          <thead>
+            <tr>
+              <th>Product Name</th>
+              <th>SKU</th>
+              <th>HSN Code</th>
+              <th>Stock Status</th>
+              <th style={{ textAlign: 'right' }}>Stock Qty</th>
+              <th style={{ textAlign: 'right' }}>Avg Cost</th>
+              <th style={{ textAlign: 'right' }}>Selling Price</th>
+              <th style={{ textAlign: 'right' }}>Margin %</th>
+              <th style={{ textAlign: 'center', width: 100 }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredProducts.map((p) => {
+              const qty = Number(p.stockQty) || 0;
+              const cost = Number(p.avgCost) || 0;
+              const sell = Number(p.sellingPrice) || 0;
+              const margin = sell > 0 ? Math.round(((sell - cost) / sell) * 100) : 0;
+
+              let statusBadge = { bg: '#d1fae5', color: '#065f46', label: 'In Stock' };
+              if (qty === 0) {
+                statusBadge = { bg: '#fee2e2', color: '#991b1b', label: 'Out of Stock' };
+              } else if (qty <= 6) {
+                statusBadge = { bg: '#fef3c7', color: '#d97706', label: 'Low Stock' };
+              }
+
+              return (
+                <tr key={p.id}>
+                  <td style={{ fontWeight: 600, color: 'var(--ink)' }}>{p.name}</td>
+                  <td><code style={{ fontSize: 11, background: '#f3f4f6', padding: '2px 6px', borderRadius: 4 }}>{p.sku || '—'}</code></td>
+                  <td>{p.hsnCode || '—'}</td>
+                  <td>
+                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 600, background: statusBadge.bg, color: statusBadge.color }}>
+                      {statusBadge.label}
+                    </span>
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: qty <= 6 ? 700 : 'normal', color: qty <= 6 ? '#b91c1c' : 'inherit' }}>
+                    {qty.toLocaleString()}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>₹{cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td style={{ textAlign: 'right' }}>₹{sell.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    <span style={{ fontWeight: 600, color: margin >= 20 ? 'var(--green)' : margin > 0 ? 'var(--ink)' : '#ef4444' }}>
+                      {margin}%
+                    </span>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                      <button 
+                        onClick={() => openEditModal(p)} 
+                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--green-m)', fontSize: 12, fontWeight: 600 }}
+                      >
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(p.id)} 
+                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 12, fontWeight: 600 }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {filteredProducts.length === 0 && (
+              <tr>
+                <td colSpan="9" style={{ textAlign: 'center', padding: '40px 0', color: 'var(--ink3)' }}>
+                  No stock items match search filters. Click "Add Product" to register new inventory stock.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {isModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: 16 }}>
+          <div className="card" style={{ maxWidth: 460, width: '100%', padding: 24, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>
+              {editingProduct ? 'Edit Product Stock' : 'Add New Product Stock'}
+            </h3>
+            
+            {error && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', padding: '10px 12px', borderRadius: 6, fontSize: 12, marginBottom: 16 }}>
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleModalSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 4 }}>Product Name *</label>
+                <input 
+                  type="text" 
+                  value={modalForm.name} 
+                  onChange={e => setModalForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g. Acme Widgets A"
+                  style={{ width: '100%', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 6, fontSize: 13 }}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 4 }}>SKU / Part Number</label>
+                  <input 
+                    type="text" 
+                    value={modalForm.sku} 
+                    onChange={e => setModalForm(prev => ({ ...prev, sku: e.target.value }))}
+                    placeholder="e.g. ACM-WID-A"
+                    style={{ width: '100%', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 6, fontSize: 13 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 4 }}>HSN Code</label>
+                  <input 
+                    type="text" 
+                    value={modalForm.hsnCode} 
+                    onChange={e => setModalForm(prev => ({ ...prev, hsnCode: e.target.value }))}
+                    placeholder="e.g. 8471"
+                    style={{ width: '100%', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 6, fontSize: 13 }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 4 }}>Stock Qty</label>
+                  <input 
+                    type="number" 
+                    value={modalForm.stockQty} 
+                    onChange={e => setModalForm(prev => ({ ...prev, stockQty: Number(e.target.value) }))}
+                    style={{ width: '100%', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 6, fontSize: 13 }}
+                    min="0"
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 4 }}>Avg Cost (₹)</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    value={modalForm.avgCost} 
+                    onChange={e => setModalForm(prev => ({ ...prev, avgCost: Number(e.target.value) }))}
+                    style={{ width: '100%', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 6, fontSize: 13 }}
+                    min="0"
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 4 }}>Sell Price (₹)</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    value={modalForm.sellingPrice} 
+                    onChange={e => setModalForm(prev => ({ ...prev, sellingPrice: Number(e.target.value) }))}
+                    style={{ width: '100%', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 6, fontSize: 13 }}
+                    min="0"
+                  />
+                </div>
+              </div>
+
+              {modalForm.sellingPrice > 0 && (
+                <div style={{ background: '#f9fafb', padding: 8, borderRadius: 6, fontSize: 12, color: 'var(--ink2)', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Calculated Margin:</span>
+                  <strong style={{ color: modalForm.sellingPrice >= modalForm.avgCost ? 'var(--green)' : '#ef4444' }}>
+                    {Math.round(((modalForm.sellingPrice - modalForm.avgCost) / modalForm.sellingPrice) * 100)}%
+                  </strong>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 10 }}>
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalOpen(false)}
+                  className="btn btn-ghost"
+                  style={{ border: '1px solid var(--border)', padding: '8px 16px' }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  style={{ padding: '8px 16px' }}
+                  disabled={loading}
+                >
+                  {loading ? 'Saving...' : 'Save Product'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LedgerDashboard() {
   const { user, logout, authFetch, setUser } = useAuth();
   const [screen, setScreen] = useState(0);
@@ -991,10 +1428,19 @@ export default function LedgerDashboard() {
   };
 
   const deleteInvoice = async (id) => {
-    if (!window.confirm('Delete this invoice?')) return;
+    if (!window.confirm('Delete this document?')) return;
+    const isPurchase = purchases.some(p => p.id === id);
+    const url = isPurchase ? `/api/purchases/${id}` : `/api/invoices/${id}`;
     try {
-      const res = await authFetch(`/api/invoices/${id}`, { method: 'DELETE' });
-      if (res.ok) setInvoices(prev => prev.filter(inv => inv.id !== id));
+      const res = await authFetch(url, { method: 'DELETE' });
+      if (res.ok) {
+        if (isPurchase) {
+          setPurchases(prev => prev.filter(p => p.id !== id));
+        } else {
+          setInvoices(prev => prev.filter(inv => inv.id !== id));
+        }
+        fetchProducts();
+      }
     } catch (e) {
       console.error(e);
     }
@@ -1100,12 +1546,12 @@ export default function LedgerDashboard() {
 
   const recentInvoices = useMemo(() => {
     const all = [
-      ...invoices.map(i => ({ type: 'SALE', party: i.clientName, amount: i.totalAmount || i.amount, date: i.date || i.createdAt, status: i.status === 'paid' ? 'Paid' : 'Pending', ts: new Date(i.createdAt).getTime() })),
-      ...purchases.map(p => ({ type: 'BUY', party: p.supplierName, amount: p.total, date: p.invoiceDate || p.createdAt, status: p.status, ts: new Date(p.createdAt).getTime() }))
+      ...invoices.map(i => ({ type: 'SALE', party: i.clientName, amount: i.totalAmount || i.amount, date: i.date || i.createdAt, status: i.status === 'paid' ? 'Paid' : 'Pending', ts: safeGetTime(i.createdAt || i.date) })),
+      ...purchases.map(p => ({ type: 'BUY', party: p.supplierName, amount: p.total, date: p.invoiceDate || p.createdAt, status: p.status, ts: safeGetTime(p.createdAt || p.invoiceDate) }))
     ];
     return all.sort((a, b) => b.ts - a.ts).slice(0, 5).map(x => ({
       ...x,
-      date: new Date(x.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
+      date: safeFormatDate(x.date)
     }));
   }, [invoices, purchases]);
 
@@ -1114,13 +1560,19 @@ export default function LedgerDashboard() {
     const process = (arr, key) => {
       arr.forEach(item => {
         const d = new Date(item.date || item.invoiceDate || item.createdAt);
-        const m = d.toLocaleString('en-IN', { month: 'short' });
+        let m = 'Unknown';
+        if (!isNaN(d.getTime())) {
+          m = d.toLocaleString('en-IN', { month: 'short' });
+        }
         if (!dataByMonth[m]) dataByMonth[m] = { m, rev: 0, cost: 0 };
         dataByMonth[m][key] += Number(item.totalAmount || item.amount || item.total || 0);
       });
     };
     process(invoices, 'rev');
     process(purchases, 'cost');
+    if (dataByMonth['Unknown'] && dataByMonth['Unknown'].rev === 0 && dataByMonth['Unknown'].cost === 0) {
+      delete dataByMonth['Unknown'];
+    }
     return Object.values(dataByMonth);
   }, [invoices, purchases]);
 
@@ -1134,7 +1586,8 @@ export default function LedgerDashboard() {
     2: "Upload Invoice",
     3: "Review Invoice",
     4: "Analytics",
-    5: "Settings"
+    5: "Settings",
+    6: "Products & Stock"
   };
 
   return (
@@ -1163,9 +1616,10 @@ export default function LedgerDashboard() {
             {screen === 0 && <Dashboard setScreen={setScreen} user={user} stats={stats} monthData={monthData} recentInvoices={recentInvoices} />}
             {screen === 1 && <InvoiceHub setScreen={setScreen} invoices={invoices} purchases={purchases} setShowCreate={setShowCreate} updateInvoiceStatus={updateInvoiceStatus} statusUpdating={statusUpdating} deleteInvoice={deleteInvoice} handleExportCSV={handleExportCSV} />}
             {screen === 2 && <UploadInvoice setScreen={setScreen} authFetch={authFetch} setExtractedData={setExtractedData} setExtractedImage={setExtractedImage} />}
-            {screen === 3 && <ReviewExtraction setScreen={setScreen} extractedData={extractedData} extractedImage={extractedImage} authFetch={authFetch} fetchPurchases={fetchPurchases} fetchProducts={fetchProducts} />}
+            {screen === 3 && <ReviewExtraction setScreen={setScreen} extractedData={extractedData} extractedImage={extractedImage} authFetch={authFetch} fetchInvoices={fetchInvoices} fetchPurchases={fetchPurchases} fetchProducts={fetchProducts} />}
             {screen === 4 && <Analytics products={products} stats={stats} handleExportCSV={handleExportCSV} />}
             {screen === 5 && <SettingsScreen user={user} setUser={setUser} authFetch={authFetch} />}
+            {screen === 6 && <ProductsStockManager products={products} authFetch={authFetch} fetchProducts={fetchProducts} handleExportCSV={handleExportCSV} />}
           </div>
         </main>
         

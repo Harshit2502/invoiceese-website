@@ -21,7 +21,18 @@ const pool = process.env.DATABASE_URL
 const initializeDatabase = async () => {
   try {
     // Run migrations in order
-    const migrations = ['000_create_users_table.sql', '001_create_conversations_table.sql', '002_add_missing_fields.sql', '003_add_client_fields.sql', '004_add_gst_invoice_fields.sql', '005_add_inventory_and_purchases.sql', '006_widen_state_code_columns.sql', '007_invoice_number_per_user.sql', '008_create_documents_table.sql'];
+    const migrations = [
+      '000_create_users_table.sql',
+      '001_create_conversations_table.sql',
+      '002_add_missing_fields.sql',
+      '003_add_client_fields.sql',
+      '004_add_gst_invoice_fields.sql',
+      '005_add_inventory_and_purchases.sql',
+      '006_widen_state_code_columns.sql',
+      '007_invoice_number_per_user.sql',
+      '008_create_documents_table.sql',
+      '009_add_hsn_code_to_products.sql'
+    ];
     
     for (const migration of migrations) {
       const migrationPath = path.join(__dirname, 'migrations', migration);
@@ -385,7 +396,7 @@ const resetConversation = async (whatsappNumber) => {
 const getProducts = async (userId) => {
   if (!isValidUUID(userId)) return [];
   return dbQuery(
-    `SELECT id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice", created_at as "createdAt", updated_at as "updatedAt" FROM products WHERE user_id = $1 ORDER BY name ASC`,
+    `SELECT id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice", hsn_code as "hsnCode", created_at as "createdAt", updated_at as "updatedAt" FROM products WHERE user_id = $1 ORDER BY name ASC`,
     [userId]
   );
 };
@@ -393,7 +404,7 @@ const getProducts = async (userId) => {
 const getProductById = async (productId) => {
   if (!isValidUUID(productId)) return null;
   return dbQuerySingle(
-    `SELECT id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice", created_at as "createdAt", updated_at as "updatedAt" FROM products WHERE id = $1`,
+    `SELECT id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice", hsn_code as "hsnCode", created_at as "createdAt", updated_at as "updatedAt" FROM products WHERE id = $1`,
     [productId]
   );
 };
@@ -401,18 +412,18 @@ const getProductById = async (productId) => {
 const getProductByName = async (userId, name) => {
   if (!isValidUUID(userId)) return null;
   return dbQuerySingle(
-    `SELECT id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice" FROM products WHERE user_id = $1 AND LOWER(name) = LOWER($2)`,
+    `SELECT id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice", hsn_code as "hsnCode" FROM products WHERE user_id = $1 AND LOWER(name) = LOWER($2)`,
     [userId, name]
   );
 };
 
 const createProduct = async (productData) => {
-  const { id, userId, name, sku, stockQty = 0, avgCost = 0, sellingPrice = 0 } = productData;
+  const { id, userId, name, sku, stockQty = 0, avgCost = 0, sellingPrice = 0, hsnCode = null } = productData;
   const result = await pool.query(
-    `INSERT INTO products (id, user_id, name, sku, stock_qty, avg_cost, selling_price, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-     RETURNING id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice"`,
-    [id, userId, name, sku || null, stockQty, avgCost, sellingPrice]
+    `INSERT INTO products (id, user_id, name, sku, stock_qty, avg_cost, selling_price, hsn_code, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+     RETURNING id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice", hsn_code as "hsnCode"`,
+    [id, userId, name, sku || null, stockQty, avgCost, sellingPrice, hsnCode]
   );
   return result.rows[0];
 };
@@ -496,11 +507,11 @@ const getRecurringClients = async (userId) => {
   );
 };
 
-const updateProduct = async (productId, { name, sku, stockQty, avgCost, sellingPrice }) => {
+const updateProduct = async (productId, { name, sku, stockQty, avgCost, sellingPrice, hsnCode }) => {
   if (!isValidUUID(productId)) return null;
   return dbQuerySingle(
-    `UPDATE products SET name = $1, sku = $2, stock_qty = $3, avg_cost = $4, selling_price = $5, updated_at = NOW() WHERE id = $6 RETURNING id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice"`,
-    [name, sku, Number(stockQty) || 0, Number(avgCost) || 0, Number(sellingPrice) || 0, productId]
+    `UPDATE products SET name = $1, sku = $2, stock_qty = $3, avg_cost = $4, selling_price = $5, hsn_code = $6, updated_at = NOW() WHERE id = $7 RETURNING id, user_id as "userId", name, sku, stock_qty as "stockQty", avg_cost as "avgCost", selling_price as "sellingPrice", hsn_code as "hsnCode"`,
+    [name, sku, Number(stockQty) || 0, Number(avgCost) || 0, Number(sellingPrice) || 0, hsnCode || null, productId]
   );
 };
 

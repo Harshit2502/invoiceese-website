@@ -4,6 +4,31 @@ const authenticateToken = require('../middleware/auth');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
 
+function standardizeDate(dateStr) {
+  if (!dateStr) return null;
+  // If it's already in YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return dateStr;
+  }
+  // Try parsing the date
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    return d.toISOString().split('T')[0];
+  }
+  // Handle DD/MM/YYYY or DD-MM-YYYY formats specifically
+  const parts = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (parts) {
+    const day = parts[1].padStart(2, '0');
+    const month = parts[2].padStart(2, '0');
+    const year = parts[3];
+    const testDate = new Date(`${year}-${month}-${day}`);
+    if (!isNaN(testDate.getTime())) {
+      return `${year}-${month}-${day}`;
+    }
+  }
+  return new Date().toISOString().split('T')[0];
+}
+
 router.use(authenticateToken);
 
 // GET /api/purchases
@@ -177,7 +202,7 @@ router.post('/', async (req, res) => {
           supplierName: supplier,
           supplierGst: gst || '',
           invoiceNumber: invoiceNo || `PI-${Date.now()}`,
-          invoiceDate: date || new Date().toISOString().split('T')[0],
+          invoiceDate: standardizeDate(date || new Date().toISOString().split('T')[0]),
           total: Number(total),
           subtotal: Number(subtotal),
           gstAmount: Number(gstAmt),
@@ -223,7 +248,7 @@ router.post('/', async (req, res) => {
           notes: '',
           dueDate: null,
           status: 'unpaid',
-          date: date || new Date().toISOString().split('T')[0],
+          date: standardizeDate(date || new Date().toISOString().split('T')[0]),
           createdAt: new Date().toISOString(),
           templateStyle: requestedTemplateStyle,
           showWatermark: true
@@ -317,7 +342,7 @@ router.post('/', async (req, res) => {
         supplierName: supplier,
         supplierGst: gst,
         invoiceNumber: invoiceNo,
-        invoiceDate: date || new Date().toISOString().split('T')[0],
+        invoiceDate: standardizeDate(date || new Date().toISOString().split('T')[0]),
         total: Number(total),
         subtotal: Number(subtotal),
         gstAmount: Number(gstAmt),
@@ -375,7 +400,7 @@ router.post('/', async (req, res) => {
           invoiceNumber: invoiceNo,
           clientName: supplier,
           clientGst: gst,
-          date: date || new Date().toISOString().split('T')[0],
+          date: standardizeDate(date || new Date().toISOString().split('T')[0]),
           items: processedItems,
           amount: Number(subtotal),
           gstRate: subtotal > 0 ? Math.round((Number(gstAmt) * 100) / Number(subtotal)) : 0,
@@ -403,7 +428,7 @@ router.post('/', async (req, res) => {
         gstRate: subtotal > 0 ? Math.round((Number(gstAmt) * 100) / Number(subtotal)) : 0,
         gstAmount: Number(gstAmt),
         total: Number(total),
-        docDate: date || new Date().toISOString().split('T')[0],
+        docDate: standardizeDate(date || new Date().toISOString().split('T')[0]),
         pdfUrl,
         status: 'unpaid'
       });
@@ -414,6 +439,38 @@ router.post('/', async (req, res) => {
   } catch (error) {
     console.error('Error saving purchase:', error);
     res.status(500).json({ error: 'Failed to save purchase invoice' });
+  }
+});
+
+// DELETE /api/purchases/:id
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  if (process.env.USE_POSTGRES !== 'true') {
+    try {
+      if (!db.purchases) db.purchases = [];
+      const idx = db.purchases.findIndex(p => p.id === id && p.userId === req.userId);
+      if (idx === -1) return res.status(404).json({ error: 'Purchase invoice not found' });
+
+      db.purchases.splice(idx, 1);
+      return res.json({ message: 'Purchase invoice deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting purchase in-memory:', error);
+      return res.status(500).json({ error: 'Failed to delete purchase invoice' });
+    }
+  }
+
+  try {
+    const pgFunctions = require('../db-postgres');
+    const purchase = await pgFunctions.getDocumentById(id);
+    if (!purchase || purchase.user_id !== req.userId || purchase.doc_type !== 'purchase_invoice') {
+      return res.status(404).json({ error: 'Purchase invoice not found' });
+    }
+    await pgFunctions.deleteDocument(id);
+    res.json({ message: 'Purchase invoice deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting purchase:', error);
+    res.status(500).json({ error: 'Failed to delete purchase invoice' });
   }
 });
 

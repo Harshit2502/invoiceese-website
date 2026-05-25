@@ -15,4 +15,13 @@ dist/
 # Runtime artifacts
 pdfs/
 *.log
-node_modules
+node_modules/
+
+# Cache and Temp files
+.eslintcache
+.cache/
+client/node_modules/
+server/node_modules/
+
+# Local database
+server/test_db_data/
