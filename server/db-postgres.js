@@ -31,7 +31,8 @@ const initializeDatabase = async () => {
       '006_widen_state_code_columns.sql',
       '007_invoice_number_per_user.sql',
       '008_create_documents_table.sql',
-      '009_add_hsn_code_to_products.sql'
+      '009_add_hsn_code_to_products.sql',
+      '010_create_parties_table.sql'
     ];
     
     for (const migration of migrations) {
@@ -493,16 +494,7 @@ const getPurchases = async (userId) => {
 const getRecurringClients = async (userId) => {
   if (!isValidUUID(userId)) return [];
   return dbQuery(
-    `SELECT party_name as "name", party_gst as "gst", party_address as "address", party_mobile as "mobile", party_state as "state", party_state_code as "stateCode" 
-     FROM (
-       SELECT party_name, party_gst, party_address, party_mobile, party_state, party_state_code, ROW_NUMBER() OVER (PARTITION BY party_name ORDER BY created_at DESC) as rn
-       FROM documents 
-       WHERE user_id = $1 AND party_name IS NOT NULL AND party_name != ''
-     ) t
-     WHERE rn = 1 AND party_name IN (
-       SELECT party_name FROM documents WHERE user_id = $1 GROUP BY party_name HAVING COUNT(*) >= 2
-     )
-     ORDER BY party_name ASC`,
+    `SELECT name, gst, address, mobile, state, state_code as "stateCode", type FROM parties WHERE user_id = $1 ORDER BY name ASC`,
     [userId]
   );
 };

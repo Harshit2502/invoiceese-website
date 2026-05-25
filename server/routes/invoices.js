@@ -207,7 +207,7 @@ router.post('/', async (req, res) => {
       const quantity = Number(item.quantity);
       const unitPrice = Number(item.unitPrice);
       const discount = Number(item.discount) || 0;
-      const discountType = item.discountType || '₹';
+      const discountType = item.discountType || 'Rs';
       let productId = null;
 
       if (process.env.USE_POSTGRES === 'true') {
