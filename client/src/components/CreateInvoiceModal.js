@@ -26,6 +26,7 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
     gstRate: hasGst ? 18 : 0,
     notes: '',
     templateStyle: isPro ? (user?.templateStyle || 'modern') : 'modern',
+    validUntil: '',
   });
   
   const [createError, setCreateError] = useState('');
@@ -126,7 +127,8 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
     }, 0).toFixed(2)
   );
 
-  const previewGstAmount = Number(((itemsSubtotal * (Number(createForm.gstRate) || 0)) / 100).toFixed(2));
+  const currentGstRate = (hasGst && createForm.docType !== 'quotation') ? (Number(createForm.gstRate) || 0) : 0;
+  const previewGstAmount = Number(((itemsSubtotal * currentGstRate) / 100).toFixed(2));
   const previewTotal = Number((itemsSubtotal + previewGstAmount).toFixed(2));
 
   const handleCreate = async e => {
@@ -134,14 +136,17 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
     setCreateError('');
     setCreating(true);
     try {
-      const res = await authFetch('/api/invoices', {
+      const isQuoteOrProforma = ['quotation', 'proforma'].includes(createForm.docType);
+      const url = isQuoteOrProforma ? '/api/quotations' : '/api/invoices';
+      const isQuotation = createForm.docType === 'quotation';
+      const res = await authFetch(url, {
         method: 'POST',
         body: JSON.stringify({
             ...createForm,
-            gstRate: hasGst ? createForm.gstRate : 0,
+            gstRate: (hasGst && !isQuotation) ? createForm.gstRate : 0,
             items: (createForm.items || []).map((item) => ({
               description: String(item.description || '').trim(),
-              hsn: hasGst ? String(item.hsn || '').trim() : '',
+              hsn: (hasGst && !isQuotation) ? String(item.hsn || '').trim() : '',
               uom: String(item.uom || 'PCS.').trim(),
               quantity: Number(item.quantity) || 0,
               unitPrice: Number(item.unitPrice) || 0,
@@ -172,6 +177,8 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 10 }}>
           <h2 style={{ margin: 0, fontSize: 18, color: '#111827' }}>
             {createForm.docType === 'sales_invoice' ? 'Create Sales Invoice' :
+             createForm.docType === 'quotation' ? 'New Quotation' :
+             createForm.docType === 'proforma' ? 'Create Proforma Invoice' :
              createForm.docType === 'credit_note' ? 'Create Credit Note' :
              createForm.docType === 'debit_note' ? 'Create Debit Note' :
              createForm.docType === 'provisional_invoice' ? 'Create Provisional Invoice' :
@@ -189,6 +196,8 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
                 <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Document Type *</label>
                 <select style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box', background: '#fff' }} name="docType" value={createForm.docType} onChange={handleCreateChange}>
                   <option value="sales_invoice">Sales Invoice</option>
+                  <option value="quotation">Quotation</option>
+                  <option value="proforma">Proforma Invoice</option>
                   <option value="provisional_invoice">Provisional Invoice</option>
                   <option value="delivery_challan">Delivery Challan</option>
                   <option value="credit_note">Credit Note (Returns)</option>
@@ -246,13 +255,19 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
                 <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Client Address</label>
                 <input style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} name="clientAddress" value={createForm.clientAddress || ''} onChange={handleCreateChange} placeholder="123 Street, City" />
               </div>
-              <div style={{ flex: '1 1 200px' }}>
+              <div style={{ flex: '1 1 150px' }}>
                 <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Client Mobile</label>
                 <input style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} name="clientMobile" value={createForm.clientMobile || ''} onChange={handleCreateChange} placeholder="9876543210" />
               </div>
+              {createForm.docType === 'quotation' && (
+                <div style={{ flex: '1 1 150px' }}>
+                  <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Valid Until *</label>
+                  <input style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} type="date" name="validUntil" value={createForm.validUntil || ''} onChange={handleCreateChange} required />
+                </div>
+              )}
             </div>
 
-            {hasGst && (
+            {hasGst && createForm.docType !== 'quotation' && (
               <>
                 <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
                   <div style={{ flex: '2 1 150px' }}>
@@ -310,7 +325,7 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
                     onChange={(e) => handleItemChange(index, 'description', e.target.value)}
                     required
                   />
-                  {hasGst && (
+                  {hasGst && createForm.docType !== 'quotation' && (
                     <input
                       style={{ flex: '1 1 80px', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }}
                       placeholder="HSN"
@@ -371,7 +386,7 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
             </div>
 
             <div style={{ display: 'flex', gap: 20, marginBottom: 24, flexWrap: 'wrap' }}>
-              {hasGst && (
+              {hasGst && createForm.docType !== 'quotation' && (
                 <div style={{ flex: '1 1 200px' }}>
                   <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>GST Rate (%)</label>
                   <select style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box', background: '#fff' }} name="gstRate" value={createForm.gstRate} onChange={handleCreateChange}>
@@ -401,7 +416,7 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
                 <span style={{ color: '#6b7280' }}>Subtotal:</span>
                 <span style={{ fontWeight: 600 }}>₹{itemsSubtotal.toFixed(2)}</span>
               </div>
-              {hasGst && (
+              {hasGst && createForm.docType !== 'quotation' && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 14 }}>
                   <span style={{ color: '#6b7280' }}>GST ({createForm.gstRate}%):</span>
                   <span style={{ fontWeight: 600 }}>₹{previewGstAmount.toFixed(2)}</span>
@@ -416,7 +431,10 @@ export default function CreateInvoiceModal({ onClose, onSuccess, user }) {
             <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, borderTop: '1px solid #e5e7eb', paddingTop: 20 }}>
               <button type="button" onClick={onClose} style={{ padding: '10px 16px', background: '#fff', border: '1px solid #d1d5db', borderRadius: 8, cursor: 'pointer', fontWeight: 600, color: '#374151' }}>Cancel</button>
               <button type="submit" disabled={creating} style={{ padding: '10px 20px', background: '#0F6E56', border: 'none', borderRadius: 8, cursor: creating ? 'not-allowed' : 'pointer', fontWeight: 600, color: '#fff', opacity: creating ? 0.7 : 1 }}>
-                {creating ? 'Creating...' : 'Create Sales Invoice'}
+                {creating ? 'Creating...' : 
+                 createForm.docType === 'quotation' ? 'Create Quotation' :
+                 createForm.docType === 'proforma' ? 'Create Proforma Invoice' :
+                 createForm.docType === 'sales_invoice' ? 'Create Sales Invoice' : 'Create Document'}
               </button>
             </div>
           </form>

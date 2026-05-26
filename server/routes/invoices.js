@@ -397,12 +397,23 @@ router.post('/', async (req, res) => {
     gstType: calculatedGstType,
     totalAmount,
     notes: notes || '',
-    dueDate: dueDate || null,
+    dueDate: (() => {
+      if (dueDate) return dueDate;
+      const defaultDays = user.defaultDueDays || 30;
+      const due = new Date();
+      due.setDate(due.getDate() + defaultDays);
+      return due.toISOString().split('T')[0];
+    })(),
     status: 'unpaid',
     date: new Date().toISOString().split('T')[0],
     createdAt: new Date().toISOString(),
     templateStyle: requestedTemplateStyle || user.templateStyle || 'modern',
     showWatermark: user.plan === 'free' ? true : (user.showWatermark !== false),
+    paymentStatus: req.body.paymentStatus || 'unpaid',
+    paidAmount: req.body.paidAmount !== undefined ? Number(req.body.paidAmount) : 0.00,
+    validUntil: null,
+    quoteStatus: null,
+    convertedInvoiceId: null
   };
 
   // Generate PDF for the invoice
@@ -435,9 +446,23 @@ router.post('/', async (req, res) => {
     const pgFunctions = require('../db-postgres');
     await pgFunctions.createInvoice(invoice);
     await pgFunctions.updateUser(user.id, { invoices_this_month: (user.invoicesThisMonth || 0) + 1 });
+    
+    // Automatically initialize a default reminder configuration record
+    const remindOnDays = user.defaultRemindOnDays || [1, 3, 7, 14];
+    const channels = user.defaultReminderChannels || ['email'];
+    await pgFunctions.upsertPaymentReminder(invoice.id, { remindOnDays, channels });
   } else {
     db.invoices.push(invoice);
     user.invoicesThisMonth = (user.invoicesThisMonth || 0) + 1;
+    
+    // Automatically initialize in-memory reminder config
+    if (!db.paymentReminders) db.paymentReminders = [];
+    db.paymentReminders.push({
+      invoiceId: invoice.id,
+      remindOnDays: user.defaultRemindOnDays || [1, 3, 7, 14],
+      channels: user.defaultReminderChannels || ['email'],
+      lastSentAt: null
+    });
   }
 
   res.status(201).json({ invoice, message: 'Invoice created successfully' });
@@ -459,17 +484,35 @@ router.patch('/:id/status', async (req, res) => {
   }
   if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
 
-  const { status } = req.body;
-  if (!['paid', 'unpaid', 'overdue'].includes(status)) {
+  const { status, paymentStatus, paidAmount, dueDate } = req.body;
+  if (status && !['paid', 'unpaid', 'overdue'].includes(status)) {
     return res.status(400).json({ error: 'Status must be paid, unpaid, or overdue' });
+  }
+  if (paymentStatus && !['paid', 'unpaid', 'partial'].includes(paymentStatus)) {
+    return res.status(400).json({ error: 'Payment status must be paid, unpaid, or partial' });
   }
 
   if (process.env.USE_POSTGRES === 'true') {
     const pgFunctions = require('../db-postgres');
-    await pgFunctions.updateInvoiceStatus(invoice.id, status);
+    if (status) {
+      await pgFunctions.updateInvoiceStatus(invoice.id, status);
+    }
+    if (paymentStatus !== undefined || paidAmount !== undefined || dueDate !== undefined) {
+      const updates = {
+        paymentStatus: paymentStatus !== undefined ? paymentStatus : invoice.paymentStatus,
+        paidAmount: paidAmount !== undefined ? Number(paidAmount) : invoice.paidAmount,
+        dueDate: dueDate !== undefined ? dueDate : invoice.dueDate
+      };
+      await pgFunctions.updateInvoicePaymentDetails(invoice.id, updates);
+    }
   }
-  invoice.status = status;
-  res.json({ invoice, message: 'Status updated' });
+
+  if (status) invoice.status = status;
+  if (paymentStatus) invoice.paymentStatus = paymentStatus;
+  if (paidAmount !== undefined) invoice.paidAmount = Number(paidAmount);
+  if (dueDate !== undefined) invoice.dueDate = dueDate;
+
+  res.json({ invoice, message: 'Status updated successfully' });
 });
 
 // DELETE /api/invoices/:id
@@ -516,6 +559,94 @@ publicRouter.get('/:id/pdf', async (req, res) => {
     console.error('Error streaming PDF:', err);
     res.status(500).json({ error: 'Error downloading PDF' });
   });
+});
+
+// GET /api/invoices/:id/reminder - fetch reminder configuration and log timeline
+router.get('/:id/reminder', async (req, res) => {
+  try {
+    const { id } = req.params;
+    let config = null;
+    let logs = [];
+
+    if (process.env.USE_POSTGRES === 'true') {
+      const pgFunctions = require('../db-postgres');
+      config = await pgFunctions.getPaymentReminder(id);
+      logs = await pgFunctions.getReminderLogs(id);
+    } else {
+      if (!db.paymentReminders) db.paymentReminders = [];
+      if (!db.reminderLogs) db.reminderLogs = [];
+      config = db.paymentReminders.find(c => c.invoiceId === id);
+      logs = db.reminderLogs.filter(l => l.invoiceId === id).sort((a,b) => new Date(b.sentAt) - new Date(a.sentAt));
+    }
+
+    if (!config) {
+      config = {
+        invoiceId: id,
+        remindOnDays: [1, 3, 7, 14],
+        channels: ['email'],
+        lastSentAt: null
+      };
+    }
+
+    res.json({ config, logs });
+  } catch (err) {
+    console.error('Error fetching reminder config:', err);
+    res.status(500).json({ error: 'Failed to fetch reminder config' });
+  }
+});
+
+// POST /api/invoices/:id/reminder - upsert reminder configuration
+router.post('/:id/reminder', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { remindOnDays, channels } = req.body;
+
+    if (remindOnDays && !Array.isArray(remindOnDays)) {
+      return res.status(400).json({ error: 'remindOnDays must be an array of numbers' });
+    }
+    if (channels && !Array.isArray(channels)) {
+      return res.status(400).json({ error: 'channels must be an array of strings' });
+    }
+
+    let config = null;
+    if (process.env.USE_POSTGRES === 'true') {
+      const pgFunctions = require('../db-postgres');
+      config = await pgFunctions.upsertPaymentReminder(id, { remindOnDays, channels });
+    } else {
+      if (!db.paymentReminders) db.paymentReminders = [];
+      let existing = db.paymentReminders.find(c => c.invoiceId === id);
+      if (existing) {
+        if (remindOnDays) existing.remindOnDays = remindOnDays;
+        if (channels) existing.channels = channels;
+        config = existing;
+      } else {
+        config = {
+          invoiceId: id,
+          remindOnDays: remindOnDays || [1, 3, 7, 14],
+          channels: channels || ['email'],
+          lastSentAt: null
+        };
+        db.paymentReminders.push(config);
+      }
+    }
+
+    res.json({ config, message: 'Reminder configuration saved' });
+  } catch (err) {
+    console.error('Error saving reminder config:', err);
+    res.status(500).json({ error: 'Failed to save reminder config' });
+  }
+});
+
+// POST /api/invoices/reminders/bulk - manually trigger reminder dispatches for overdue invoices
+router.post('/reminders/bulk', async (req, res) => {
+  try {
+    const { processInvoicesReminders } = require('../services/reminder-scheduler');
+    await processInvoicesReminders(req.userId);
+    res.json({ success: true, message: 'Bulk reminders sent successfully' });
+  } catch (err) {
+    console.error('Error processing bulk reminders:', err);
+    res.status(500).json({ error: 'Failed to process bulk reminders' });
+  }
 });
 
 module.exports = router;

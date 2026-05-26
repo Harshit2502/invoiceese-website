@@ -227,6 +227,8 @@
 .badge-debit-note  { background: #F3E8FF; color: #6B21A8; }
 .badge-challan { background: #ECFDF5; color: #065F46; }
 .badge-provisional { background: #FFF7ED; color: #92400E; }
+.badge-quotation   { background: #E0F2FE; color: #075985; }
+.badge-proforma    { background: #F3E8FF; color: #6B21A8; }
 
 .status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 5px; }
 .status-paid   { background: #10B981; }

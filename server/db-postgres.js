@@ -32,7 +32,8 @@ const initializeDatabase = async () => {
       '007_invoice_number_per_user.sql',
       '008_create_documents_table.sql',
       '009_add_hsn_code_to_products.sql',
-      '010_create_parties_table.sql'
+      '010_create_parties_table.sql',
+      '011_add_payment_status_and_reminders.sql'
     ];
     
     for (const migration of migrations) {
@@ -100,7 +101,7 @@ const createUser = async (userData) => {
 
 const getUserByEmail = async (email) => {
   return dbQuerySingle(
-    `SELECT id, email, whatsapp, password_hash as "passwordHash", business_name as "businessName", gst_number as "gstNumber", pan_number as "panNumber", address, city, pincode, state, state_code as "stateCode", bank_name as "bankName", account_number as "accountNumber", ifsc_code as "ifscCode", upi_id as "upiId", plan, invoices_this_month as "invoicesThisMonth", logo_url as "logoUrl", template_style as "templateStyle", show_watermark as "showWatermark", telegram_chat_id, created_at as "createdAt" FROM users WHERE email = $1`,
+    `SELECT id, email, whatsapp, password_hash as "passwordHash", business_name as "businessName", gst_number as "gstNumber", pan_number as "panNumber", address, city, pincode, state, state_code as "stateCode", bank_name as "bankName", account_number as "accountNumber", ifsc_code as "ifscCode", upi_id as "upiId", plan, invoices_this_month as "invoicesThisMonth", logo_url as "logoUrl", template_style as "templateStyle", show_watermark as "showWatermark", telegram_chat_id, default_due_days as "defaultDueDays", default_remind_on_days as "defaultRemindOnDays", default_reminder_channels as "defaultReminderChannels", created_at as "createdAt" FROM users WHERE email = $1`,
     [email]
   );
 };
@@ -108,21 +109,21 @@ const getUserByEmail = async (email) => {
 const getUserById = async (id) => {
   if (!isValidUUID(id)) return null;
   return dbQuerySingle(
-    `SELECT id, email, whatsapp, password_hash as "passwordHash", business_name as "businessName", gst_number as "gstNumber", pan_number as "panNumber", address, city, pincode, state, state_code as "stateCode", bank_name as "bankName", account_number as "accountNumber", ifsc_code as "ifscCode", upi_id as "upiId", plan, invoices_this_month as "invoicesThisMonth", logo_url as "logoUrl", template_style as "templateStyle", show_watermark as "showWatermark", telegram_chat_id, created_at as "createdAt" FROM users WHERE id = $1`,
+    `SELECT id, email, whatsapp, password_hash as "passwordHash", business_name as "businessName", gst_number as "gstNumber", pan_number as "panNumber", address, city, pincode, state, state_code as "stateCode", bank_name as "bankName", account_number as "accountNumber", ifsc_code as "ifscCode", upi_id as "upiId", plan, invoices_this_month as "invoicesThisMonth", logo_url as "logoUrl", template_style as "templateStyle", show_watermark as "showWatermark", telegram_chat_id, default_due_days as "defaultDueDays", default_remind_on_days as "defaultRemindOnDays", default_reminder_channels as "defaultReminderChannels", created_at as "createdAt" FROM users WHERE id = $1`,
     [id]
   );
 };
 
 const getUserByWhatsApp = async (whatsapp) => {
   return dbQuerySingle(
-    `SELECT id, email, whatsapp, password_hash as "passwordHash", business_name as "businessName", gst_number as "gstNumber", pan_number as "panNumber", address, city, pincode, state, state_code as "stateCode", bank_name as "bankName", account_number as "accountNumber", ifsc_code as "ifscCode", upi_id as "upiId", plan, invoices_this_month as "invoicesThisMonth", logo_url as "logoUrl", template_style as "templateStyle", show_watermark as "showWatermark", telegram_chat_id, created_at as "createdAt" FROM users WHERE whatsapp = $1`,
+    `SELECT id, email, whatsapp, password_hash as "passwordHash", business_name as "businessName", gst_number as "gstNumber", pan_number as "panNumber", address, city, pincode, state, state_code as "stateCode", bank_name as "bankName", account_number as "accountNumber", ifsc_code as "ifscCode", upi_id as "upiId", plan, invoices_this_month as "invoicesThisMonth", logo_url as "logoUrl", template_style as "templateStyle", show_watermark as "showWatermark", telegram_chat_id, default_due_days as "defaultDueDays", default_remind_on_days as "defaultRemindOnDays", default_reminder_channels as "defaultReminderChannels", created_at as "createdAt" FROM users WHERE whatsapp = $1`,
     [whatsapp]
   );
 };
 
 const updateUser = async (userId, updates) => {
   if (!isValidUUID(userId)) return null;
-  const allowedFields = ['business_name', 'gst_number', 'pan_number', 'address', 'city', 'pincode', 'state', 'state_code', 'bank_name', 'account_number', 'ifsc_code', 'upi_id', 'plan', 'invoices_this_month', 'logo_url', 'template_style', 'show_watermark', 'telegram_chat_id', 'whatsapp'];
+  const allowedFields = ['business_name', 'gst_number', 'pan_number', 'address', 'city', 'pincode', 'state', 'state_code', 'bank_name', 'account_number', 'ifsc_code', 'upi_id', 'plan', 'invoices_this_month', 'logo_url', 'template_style', 'show_watermark', 'telegram_chat_id', 'whatsapp', 'default_due_days', 'default_remind_on_days', 'default_reminder_channels'];
   
   // Convert camelCase to snake_case for DB fields if needed
   const mappedUpdates = {};
@@ -157,14 +158,14 @@ const updateUserPassword = async (userId, newPasswordHash) => {
 
 // DOCUMENT FUNCTIONS
 const createDocument = async (docData) => {
-  const { id, userId, docType, direction, parentDocumentId, docNumber, partyName, partyGst, partyAddress, partyMobile, partyState, partyStateCode, reverseCharge, transportMode, vehicleNumber, dateOfSupply, placeOfSupply, items, subtotal, gstRate, gstAmount, cgst, sgst, igst, gstType, total, serviceDescription, notes, dueDate, docDate, paymentDetails, pdfUrl, status, templateStyle, showWatermark } = docData;
+  const { id, userId, docType, direction, parentDocumentId, docNumber, partyName, partyGst, partyAddress, partyMobile, partyState, partyStateCode, reverseCharge, transportMode, vehicleNumber, dateOfSupply, placeOfSupply, items, subtotal, gstRate, gstAmount, cgst, sgst, igst, gstType, total, serviceDescription, notes, dueDate, docDate, paymentDetails, pdfUrl, status, templateStyle, showWatermark, paymentStatus, paidAmount, validUntil, quoteStatus, convertedInvoiceId } = docData;
   const itemsJson = items ? JSON.stringify(items) : '[]';
   const paymentDetailsJson = paymentDetails ? JSON.stringify(paymentDetails) : null;
   const result = await pool.query(
-    `INSERT INTO documents (id, user_id, doc_type, direction, parent_document_id, doc_number, party_name, party_gst, party_address, party_mobile, party_state, party_state_code, reverse_charge, transport_mode, vehicle_number, date_of_supply, place_of_supply, items, subtotal, gst_rate, gst_amount, cgst, sgst, igst, gst_type, total, service_description, notes, due_date, doc_date, payment_details, pdf_url, status, template_style, show_watermark, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31::jsonb, $32, $33, $34, $35, NOW(), NOW())
+    `INSERT INTO documents (id, user_id, doc_type, direction, parent_document_id, doc_number, party_name, party_gst, party_address, party_mobile, party_state, party_state_code, reverse_charge, transport_mode, vehicle_number, date_of_supply, place_of_supply, items, subtotal, gst_rate, gst_amount, cgst, sgst, igst, gst_type, total, service_description, notes, due_date, doc_date, payment_details, pdf_url, status, template_style, show_watermark, payment_status, paid_amount, valid_until, quote_status, converted_invoice_id, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31::jsonb, $32, $33, $34, $35, $36, $37, $38, $39, $40, NOW(), NOW())
      RETURNING *`,
-    [id, userId, docType, direction, parentDocumentId || null, docNumber, partyName, partyGst || null, partyAddress || null, partyMobile || null, partyState || null, partyStateCode || null, reverseCharge || false, transportMode || null, vehicleNumber || null, dateOfSupply || null, placeOfSupply || null, itemsJson, subtotal || 0, gstRate || 0, gstAmount || 0, cgst || 0, sgst || 0, igst || 0, gstType || 'intrastate', total, serviceDescription || null, notes || null, dueDate || null, docDate || null, paymentDetailsJson, pdfUrl || null, status || 'draft', templateStyle || 'modern', showWatermark === undefined ? true : showWatermark]
+    [id, userId, docType, direction, parentDocumentId || null, docNumber, partyName, partyGst || null, partyAddress || null, partyMobile || null, partyState || null, partyStateCode || null, reverseCharge || false, transportMode || null, vehicleNumber || null, dateOfSupply || null, placeOfSupply || null, itemsJson, subtotal || 0, gstRate || 0, gstAmount || 0, cgst || 0, sgst || 0, igst || 0, gstType || 'intrastate', total, serviceDescription || null, notes || null, dueDate || null, docDate || null, paymentDetailsJson, pdfUrl || null, status || 'draft', templateStyle || 'modern', showWatermark === undefined ? true : showWatermark, paymentStatus || 'unpaid', paidAmount || 0.00, validUntil || null, quoteStatus || null, convertedInvoiceId || null]
   );
   return result.rows[0];
 };
@@ -211,15 +212,18 @@ const deleteDocument = async (id) => {
 };
 
 const getNextDocNumber = async (userId, docType) => {
+  const year = new Date().getFullYear();
+  const prefixMap = { 
+    'sales_invoice': 'INV-', 
+    'purchase_invoice': 'PI-', 
+    'credit_note': 'CN-',
+    'debit_note': 'DN-',
+    'provisional_invoice': 'PROV-',
+    'delivery_challan': 'DC-',
+    'quotation': `QT-${year}-`,
+    'proforma': `PI-${year}-`
+  };
   if (!isValidUUID(userId)) {
-    const prefixMap = { 
-      'sales_invoice': 'INV-', 
-      'purchase_invoice': 'PI-', 
-      'credit_note': 'CN-',
-      'debit_note': 'DN-',
-      'provisional_invoice': 'PROV-',
-      'delivery_challan': 'DC-'
-    };
     return `${prefixMap[docType] || 'DOC-'}001`;
   }
   const result = await dbQuerySingle(
@@ -227,19 +231,14 @@ const getNextDocNumber = async (userId, docType) => {
     [userId, docType]
   );
   let nextNum = 1;
-  const prefixMap = { 
-    'sales_invoice': 'INV-', 
-    'purchase_invoice': 'PI-', 
-    'credit_note': 'CN-',
-    'debit_note': 'DN-',
-    'provisional_invoice': 'PROV-',
-    'delivery_challan': 'DC-'
-  };
   const prefix = prefixMap[docType] || 'DOC-';
   if (result && result.doc_number) {
-    const match = result.doc_number.match(new RegExp(`^${prefix}(\\d+)`));
-    if (match) {
-      nextNum = parseInt(match[1], 10) + 1;
+    if (result.doc_number.startsWith(prefix)) {
+      const remaining = result.doc_number.substring(prefix.length);
+      const match = remaining.match(/^(\d+)/);
+      if (match) {
+        nextNum = parseInt(match[1], 10) + 1;
+      }
     }
   }
   return `${prefix}${String(nextNum).padStart(3, '0')}`;
@@ -280,7 +279,14 @@ const mapDocToInvoice = (doc) => {
     pdfUrl: doc.pdf_url,
     status: doc.status,
     date: doc.doc_date,
-    createdAt: doc.created_at
+    createdAt: doc.created_at,
+    
+    // New payment status and quotation fields:
+    paymentStatus: doc.payment_status,
+    paidAmount: doc.paid_amount ? parseFloat(doc.paid_amount) : 0,
+    validUntil: doc.valid_until,
+    quoteStatus: doc.quote_status,
+    convertedInvoiceId: doc.converted_invoice_id
   };
 };
 
@@ -317,7 +323,12 @@ const createInvoice = async (invoiceData) => {
     docDate: invoiceData.date,
     pdfUrl: invoiceData.pdfUrl,
     status: invoiceData.status || 'unpaid',
-    paymentDetails: invoiceData.paymentDetails
+    paymentDetails: invoiceData.paymentDetails,
+    paymentStatus: invoiceData.paymentStatus || 'unpaid',
+    paidAmount: invoiceData.paidAmount || 0.00,
+    validUntil: invoiceData.validUntil || null,
+    quoteStatus: invoiceData.quoteStatus || null,
+    convertedInvoiceId: invoiceData.convertedInvoiceId || null
   };
   const doc = await createDocument(docData);
   return mapDocToInvoice(doc);
@@ -512,6 +523,93 @@ const deleteProduct = async (productId) => {
   return dbExecute(`DELETE FROM products WHERE id = $1`, [productId]);
 };
 
+const updateInvoicePaymentDetails = async (invoiceId, updates) => {
+  if (!isValidUUID(invoiceId)) return null;
+  const { paymentStatus, paidAmount, dueDate } = updates;
+  
+  // Update documents table
+  if (dueDate !== undefined) {
+    await pool.query(
+      `UPDATE documents SET payment_status = $1, paid_amount = $2, due_date = $3, updated_at = NOW() WHERE id = $4`,
+      [paymentStatus, paidAmount, dueDate, invoiceId]
+    );
+  } else {
+    await pool.query(
+      `UPDATE documents SET payment_status = $1, paid_amount = $2, updated_at = NOW() WHERE id = $3`,
+      [paymentStatus, paidAmount, invoiceId]
+    );
+  }
+  
+  // Update invoices table (legacy)
+  try {
+    if (dueDate !== undefined) {
+      await pool.query(
+        `UPDATE invoices SET payment_status = $1, paid_amount = $2, due_date = $3, updated_at = NOW() WHERE id = $4`,
+        [paymentStatus, paidAmount, dueDate, invoiceId]
+      );
+    } else {
+      await pool.query(
+        `UPDATE invoices SET payment_status = $1, paid_amount = $2, updated_at = NOW() WHERE id = $3`,
+        [paymentStatus, paidAmount, invoiceId]
+      );
+    }
+  } catch (err) {
+    console.warn('Could not update legacy invoices table:', err.message);
+  }
+  
+  return getInvoiceById(invoiceId);
+};
+
+const getPaymentReminder = async (invoiceId) => {
+  if (!isValidUUID(invoiceId)) return null;
+  return dbQuerySingle(
+    `SELECT id, invoice_id as "invoiceId", remind_on_days as "remindOnDays", channels, last_sent_at as "lastSentAt" FROM payment_reminders WHERE invoice_id = $1`,
+    [invoiceId]
+  );
+};
+
+const upsertPaymentReminder = async (invoiceId, config) => {
+  if (!isValidUUID(invoiceId)) return null;
+  const { remindOnDays = [1, 3, 7, 14], channels = ['email'] } = config;
+  const result = await pool.query(
+    `INSERT INTO payment_reminders (invoice_id, remind_on_days, channels, updated_at)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (invoice_id) 
+     DO UPDATE SET remind_on_days = EXCLUDED.remind_on_days, channels = EXCLUDED.channels, updated_at = NOW()
+     RETURNING id, invoice_id as "invoiceId", remind_on_days as "remindOnDays", channels, last_sent_at as "lastSentAt"`,
+    [invoiceId, remindOnDays, channels]
+  );
+  return result.rows[0];
+};
+
+const updatePaymentReminderLastSent = async (invoiceId) => {
+  if (!isValidUUID(invoiceId)) return null;
+  const result = await pool.query(
+    `UPDATE payment_reminders SET last_sent_at = NOW() WHERE invoice_id = $1 RETURNING *`,
+    [invoiceId]
+  );
+  return result.rows[0];
+};
+
+const logReminder = async (invoiceId, channel, sentTo, status, errorMessage = null) => {
+  if (!isValidUUID(invoiceId)) return null;
+  const result = await pool.query(
+    `INSERT INTO reminder_logs (invoice_id, channel, sent_to, status, error_message, sent_at)
+     VALUES ($1, $2, $3, $4, $5, NOW())
+     RETURNING id, invoice_id as "invoiceId", channel, sent_to as "sentTo", status, error_message as "errorMessage", sent_at as "sentAt"`,
+    [invoiceId, channel, sentTo, status, errorMessage]
+  );
+  return result.rows[0];
+};
+
+const getReminderLogs = async (invoiceId) => {
+  if (!isValidUUID(invoiceId)) return [];
+  return dbQuery(
+    `SELECT id, invoice_id as "invoiceId", channel, sent_to as "sentTo", status, error_message as "errorMessage", sent_at as "sentAt" FROM reminder_logs WHERE invoice_id = $1 ORDER BY sent_at DESC`,
+    [invoiceId]
+  );
+};
+
 module.exports = {
   pool,
   initializeDatabase,
@@ -553,4 +651,10 @@ module.exports = {
   createPurchaseInvoice,
   getPurchases,
   getRecurringClients,
+  updateInvoicePaymentDetails,
+  getPaymentReminder,
+  upsertPaymentReminder,
+  updatePaymentReminderLastSent,
+  logReminder,
+  getReminderLogs,
 };

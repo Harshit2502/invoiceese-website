@@ -7,6 +7,8 @@ const db = {
   invoices: [],
   purchases: [],
   products: [],
+  paymentReminders: [],
+  reminderLogs: [],
 };
 
 // Seed a demo user
@@ -33,6 +35,9 @@ const db = {
     templateStyle: 'modern',
     showWatermark: false,
     hasCustomLogo: false,
+    defaultDueDays: 30,
+    defaultRemindOnDays: [1, 3, 7, 14],
+    defaultReminderChannels: ['email'],
     createdAt: new Date().toISOString(),
   });
 

@@ -536,9 +536,16 @@ const generateModernPDF = (doc, invoice, user) => {
 
   const gridY3 = gridY2 + 15;
   drawLine(50, gridY3, 545, gridY3);
-  doc.font('Helvetica-Bold').text('Reverse Charge (Y/N):', 52, gridY3 + 4, { width: 150 }); doc.font('Helvetica').text(invoice.reverseCharge ? 'Y' : 'N', 260, gridY3 + 4);
-  drawLine(245, gridY3, 245, gridY3 + 15); // Small ver line for N
-  doc.font('Helvetica-Bold').text('Date of Supply', colMid + 2, gridY3 + 4, { width: 90 }); doc.font('Helvetica').text(`: ${invoice.dateOfSupply ? new Date(invoice.dateOfSupply).toLocaleDateString('en-IN') : 'NA'}`, colMid + 92, gridY3 + 4);
+  if (invoice.docType === 'quotation' || invoice.docType === 'proforma') {
+    doc.font('Helvetica-Bold').text('Valid Until:', 52, gridY3 + 4, { width: 90 });
+    doc.font('Helvetica').text(invoice.validUntil ? new Date(invoice.validUntil).toLocaleDateString('en-IN') : 'NA', 152, gridY3 + 4);
+    doc.font('Helvetica-Bold').text('Due Date', colMid + 2, gridY3 + 4, { width: 90 });
+    doc.font('Helvetica').text(`: ${invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('en-IN') : 'NA'}`, colMid + 92, gridY3 + 4);
+  } else {
+    doc.font('Helvetica-Bold').text('Reverse Charge (Y/N):', 52, gridY3 + 4, { width: 150 }); doc.font('Helvetica').text(invoice.reverseCharge ? 'Y' : 'N', 260, gridY3 + 4);
+    drawLine(245, gridY3, 245, gridY3 + 15); // Small ver line for N
+    doc.font('Helvetica-Bold').text('Date of Supply', colMid + 2, gridY3 + 4, { width: 90 }); doc.font('Helvetica').text(`: ${invoice.dateOfSupply ? new Date(invoice.dateOfSupply).toLocaleDateString('en-IN') : 'NA'}`, colMid + 92, gridY3 + 4);
+  }
 
   const gridY4 = gridY3 + 15;
   drawLine(50, gridY4, 545, gridY4);
@@ -649,33 +656,57 @@ const generateModernPDF = (doc, invoice, user) => {
   const valStart = cols.hsn; // from HSN line
   drawLine(50, tY, 545, tY);
   
-  // Tax breakdown lines
-  drawLine(cols.hsn, tY, cols.hsn, tY + 75); // Vertical line for tax labels
-  drawLine(cols.amount, tY, cols.amount, tY + 75); // Vertical line for tax amounts
+  const isQuote = invoice.docType === 'quotation';
   
-  // Amount in words area (left side)
-  doc.font('Helvetica-Bold').fontSize(8).text(`${numberToWords(Math.round(invoice.totalAmount || invoice.total || 0))}`.toUpperCase(), 52, tY + 4, { width: leftW - 4 });
+  if (isQuote) {
+    // Tax breakdown lines for Quotation
+    drawLine(cols.hsn, tY, cols.hsn, tY + 45); // Vertical line for labels
+    drawLine(cols.amount, tY, cols.amount, tY + 45); // Vertical line for amounts
+    
+    // Amount in words area (left side)
+    doc.font('Helvetica-Bold').fontSize(8).text(`${numberToWords(Math.round(invoice.totalAmount || invoice.total || 0))}`.toUpperCase(), 52, tY + 4, { width: leftW - 4 });
 
-  doc.text('Taxable Value', valStart, tY + 4, { width: cols.amount - valStart, align: 'center' });
-  doc.text(Number(invoice.subtotal || 0).toFixed(2), cols.amount, tY + 4, { width: 545 - cols.amount - 2, align: 'right' });
-  
-  tY += 15; drawLine(valStart, tY, 545, tY);
-  doc.text(`IGST : ${invoice.gstType === 'interstate' ? invoice.gstRate + '%' : '0%'}`, valStart, tY + 4, { width: cols.amount - valStart, align: 'center' });
-  doc.text(Number(invoice.igst || 0) > 0 ? Number(invoice.igst).toFixed(2) : '-', cols.amount, tY + 4, { width: 545 - cols.amount - 2, align: 'right' });
+    doc.text('Estimated Value', valStart, tY + 4, { width: cols.amount - valStart, align: 'center' });
+    doc.text(Number(invoice.subtotal || 0).toFixed(2), cols.amount, tY + 4, { width: 545 - cols.amount - 2, align: 'right' });
+    
+    tY += 15; drawLine(valStart, tY, 545, tY);
+    doc.text('GST Rate', valStart, tY + 4, { width: cols.amount - valStart, align: 'center' });
+    doc.text('0% (Pre-tax Estimate)', cols.amount, tY + 4, { width: 545 - cols.amount - 2, align: 'right' });
 
-  tY += 15; drawLine(valStart, tY, 545, tY);
-  doc.text(`CGST : ${invoice.gstType === 'intrastate' ? (invoice.gstRate / 2) + '%' : '0%'}`, valStart, tY + 4, { width: cols.amount - valStart, align: 'center' });
-  doc.text(Number(invoice.cgst || 0) > 0 ? Number(invoice.cgst).toFixed(2) : '-', cols.amount, tY + 4, { width: 545 - cols.amount - 2, align: 'right' });
+    tY += 15; drawLine(50, tY, 545, tY);
+    doc.text('Total Estimated Price:', valStart, tY + 4, { width: cols.amount - valStart, align: 'center' });
+    doc.text(Number(invoice.totalAmount || invoice.total || 0).toFixed(2), cols.amount, tY + 4, { width: 545 - cols.amount - 2, align: 'right' });
+    
+    tY += 15; drawLine(50, tY, 545, tY);
+  } else {
+    // Tax breakdown lines for normal invoices
+    drawLine(cols.hsn, tY, cols.hsn, tY + 75); // Vertical line for tax labels
+    drawLine(cols.amount, tY, cols.amount, tY + 75); // Vertical line for tax amounts
+    
+    // Amount in words area (left side)
+    doc.font('Helvetica-Bold').fontSize(8).text(`${numberToWords(Math.round(invoice.totalAmount || invoice.total || 0))}`.toUpperCase(), 52, tY + 4, { width: leftW - 4 });
 
-  tY += 15; drawLine(valStart, tY, 545, tY);
-  doc.text(`SGST : ${invoice.gstType === 'intrastate' ? (invoice.gstRate / 2) + '%' : '0%'}`, valStart, tY + 4, { width: cols.amount - valStart, align: 'center' });
-  doc.text(Number(invoice.sgst || 0) > 0 ? Number(invoice.sgst).toFixed(2) : '-', cols.amount, tY + 4, { width: 545 - cols.amount - 2, align: 'right' });
+    doc.text('Taxable Value', valStart, tY + 4, { width: cols.amount - valStart, align: 'center' });
+    doc.text(Number(invoice.subtotal || 0).toFixed(2), cols.amount, tY + 4, { width: 545 - cols.amount - 2, align: 'right' });
+    
+    tY += 15; drawLine(valStart, tY, 545, tY);
+    doc.text(`IGST : ${invoice.gstType === 'interstate' ? invoice.gstRate + '%' : '0%'}`, valStart, tY + 4, { width: cols.amount - valStart, align: 'center' });
+    doc.text(Number(invoice.igst || 0) > 0 ? Number(invoice.igst).toFixed(2) : '-', cols.amount, tY + 4, { width: 545 - cols.amount - 2, align: 'right' });
 
-  tY += 15; drawLine(50, tY, 545, tY);
-  doc.text('Total Amount after Tax:', valStart, tY + 4, { width: cols.amount - valStart, align: 'center' });
-  doc.text(Number(invoice.totalAmount || invoice.total || 0).toFixed(2), cols.amount, tY + 4, { width: 545 - cols.amount - 2, align: 'right' });
-  
-  tY += 15; drawLine(50, tY, 545, tY);
+    tY += 15; drawLine(valStart, tY, 545, tY);
+    doc.text(`CGST : ${invoice.gstType === 'intrastate' ? (invoice.gstRate / 2) + '%' : '0%'}`, valStart, tY + 4, { width: cols.amount - valStart, align: 'center' });
+    doc.text(Number(invoice.cgst || 0) > 0 ? Number(invoice.cgst).toFixed(2) : '-', cols.amount, tY + 4, { width: 545 - cols.amount - 2, align: 'right' });
+
+    tY += 15; drawLine(valStart, tY, 545, tY);
+    doc.text(`SGST : ${invoice.gstType === 'intrastate' ? (invoice.gstRate / 2) + '%' : '0%'}`, valStart, tY + 4, { width: cols.amount - valStart, align: 'center' });
+    doc.text(Number(invoice.sgst || 0) > 0 ? Number(invoice.sgst).toFixed(2) : '-', cols.amount, tY + 4, { width: 545 - cols.amount - 2, align: 'right' });
+
+    tY += 15; drawLine(50, tY, 545, tY);
+    doc.text('Total Amount after Tax:', valStart, tY + 4, { width: cols.amount - valStart, align: 'center' });
+    doc.text(Number(invoice.totalAmount || invoice.total || 0).toFixed(2), cols.amount, tY + 4, { width: 545 - cols.amount - 2, align: 'right' });
+    
+    tY += 15; drawLine(50, tY, 545, tY);
+  }
 
   // Footer Section
   drawRect(50, tY, 545 - 50, 15, headerBgColor);
@@ -683,11 +714,19 @@ const generateModernPDF = (doc, invoice, user) => {
   
   tY += 15;
   const footerStart = tY;
-  // Bank Details Left
-  doc.font('Helvetica-Bold').fontSize(8).text(`Bank A/C: ${user.accountNumber || ''}`, 52, tY + 4);
-  tY += 15; drawLine(50, tY, colMid, tY); // only left half
-  doc.text(`Bank IFSC: ${user.ifscCode || ''}`, 52, tY + 4);
-  tY += 15; drawLine(50, tY, colMid, tY); // only left half
+  
+  // Bank Details Left or Terms & Conditions
+  if (isQuote) {
+    doc.font('Helvetica-Bold').fontSize(8).text('TERMS & CONDITIONS:', 52, tY + 4);
+    doc.font('Helvetica').fontSize(7);
+    const terms = invoice.notes || '1. Price estimates are valid for 30 days.\n2. 50% advance payment required to commence work.\n3. Taxes will be charged extra as applicable.';
+    doc.text(terms, 52, tY + 14, { width: colMid - 60, height: 40 });
+  } else {
+    doc.font('Helvetica-Bold').fontSize(8).text(`Bank A/C: ${user.accountNumber || ''}`, 52, tY + 4);
+    tY += 15; drawLine(50, tY, colMid, tY); // only left half
+    doc.text(`Bank IFSC: ${user.ifscCode || ''}`, 52, tY + 4);
+    tY += 15; drawLine(50, tY, colMid, tY); // only left half
+  }
   
   doc.text('RECEIVERS SIGN', 52, 740);
   
@@ -699,7 +738,8 @@ const generateModernPDF = (doc, invoice, user) => {
   if (invoice.showWatermark) {
     doc.save();
     doc.rotate(-35, { origin: [300, 420] });
-    doc.fillColor('#94a3b8').opacity(0.12).fontSize(44).font('Helvetica-Bold').text('InvoiceEase', 135, 420, { align: 'center', width: 320 });
+    const watermarkText = invoice.docType === 'quotation' ? 'QUOTATION' : 'InvoiceEase';
+    doc.fillColor('#94a3b8').opacity(0.12).fontSize(44).font('Helvetica-Bold').text(watermarkText, 135, 420, { align: 'center', width: 320 });
     doc.restore(); doc.opacity(1);
   }
 };

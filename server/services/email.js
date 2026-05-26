@@ -178,8 +178,120 @@ const sendPasswordResetEmail = async (userEmail, resetUrl) => {
   }
 };
 
+const sendPaymentReminderEmail = async (clientEmail, clientName, invoiceNumber, amount, dueDate, paymentUrl) => {
+  if (!isConfigured()) {
+    console.warn('⚠️ RESEND_API_KEY not configured. Payment reminder email not sent.');
+    return { success: false, error: 'Resend API key not configured' };
+  }
+
+  const formattedAmount = new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+  }).format(amount);
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [clientEmail],
+      subject: `Payment Reminder: Invoice #${invoiceNumber} is due`,
+      html: `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb;">
+          <div style="background: linear-gradient(135deg, #0f6e56 0%, #14b88e 100%); padding: 32px 36px; text-align: center;">
+            <div style="display: inline-block; background: rgba(255,255,255,0.2); border-radius: 10px; width: 48px; height: 48px; line-height: 48px; font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 12px;">IE</div>
+            <h1 style="color: #ffffff; font-size: 22px; margin: 0;">Payment Reminder</h1>
+          </div>
+          <div style="padding: 36px;">
+            <p style="color: #374151; font-size: 15px; line-height: 1.6;">Hi <strong>${clientName}</strong>,</p>
+            <p style="color: #374151; font-size: 15px; line-height: 1.6;">This is a friendly reminder that payment for invoice <strong>#${invoiceNumber}</strong> is due on <strong>${dueDate}</strong>.</p>
+            
+            <div style="background: #f9fafb; border-radius: 10px; padding: 20px; margin: 24px 0; border: 1px solid #e5e7eb; text-align: center;">
+              <p style="margin: 0 0 8px; font-size: 14px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Amount Due</p>
+              <h2 style="margin: 0 0 16px; font-size: 28px; color: #111827; font-weight: 700;">${formattedAmount}</h2>
+              <a href="${paymentUrl}" style="display: inline-block; background: linear-gradient(135deg, #0f6e56, #14b88e); color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-size: 15px; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">Pay Now</a>
+            </div>
+            
+            <p style="color: #374151; font-size: 14px; line-height: 1.6;">If you have already paid or have any questions about this invoice, please reach out to us.</p>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+            <p style="color: #9ca3af; font-size: 12px; text-align: center;">Thank you for your business!</p>
+          </div>
+          <div style="background: #f9fafb; padding: 18px 36px; text-align: center;">
+            <p style="color: #9ca3af; font-size: 12px; margin: 0;">© ${new Date().getFullYear()} InvoiceEase. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error('Resend payment reminder email error:', error);
+      return { success: false, error };
+    }
+
+    return { success: true, data };
+  } catch (err) {
+    console.error('Failed to send payment reminder email:', err);
+    return { success: false, error: err.message };
+  }
+};
+
+const sendQuotationEmail = async (clientEmail, clientName, quoteNumber, amount, validUntil, pdfUrl) => {
+  if (!isConfigured()) {
+    console.warn('⚠️ RESEND_API_KEY not configured. Quotation email not sent.');
+    return { success: false, error: 'Resend API key not configured' };
+  }
+
+  const formattedAmount = new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+  }).format(amount);
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [clientEmail],
+      subject: `Quotation #${quoteNumber} from InvoiceEase`,
+      html: `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb;">
+          <div style="background: linear-gradient(135deg, #0f6e56 0%, #14b88e 100%); padding: 32px 36px; text-align: center;">
+            <div style="display: inline-block; background: rgba(255,255,255,0.2); border-radius: 10px; width: 48px; height: 48px; line-height: 48px; font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 12px;">IE</div>
+            <h1 style="color: #ffffff; font-size: 22px; margin: 0;">Quotation Estimations</h1>
+          </div>
+          <div style="padding: 36px;">
+            <p style="color: #374151; font-size: 15px; line-height: 1.6;">Hi <strong>${clientName}</strong>,</p>
+            <p style="color: #374151; font-size: 15px; line-height: 1.6;">Please find attached our quotation <strong>#${quoteNumber}</strong> which is valid until <strong>${validUntil}</strong>.</p>
+            
+            <div style="background: #f9fafb; border-radius: 10px; padding: 20px; margin: 24px 0; border: 1px solid #e5e7eb; text-align: center;">
+              <p style="margin: 0 0 8px; font-size: 14px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Estimated Amount</p>
+              <h2 style="margin: 0 0 16px; font-size: 28px; color: #111827; font-weight: 700;">${formattedAmount}</h2>
+              <a href="${pdfUrl}" style="display: inline-block; background: linear-gradient(135deg, #0f6e56, #14b88e); color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-size: 15px; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">Download Quotation PDF</a>
+            </div>
+            
+            <p style="color: #374151; font-size: 14px; line-height: 1.6;">Please review the details and let us know if you have any questions or would like to proceed.</p>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+            <p style="color: #9ca3af; font-size: 12px; text-align: center;">Thank you for considering us!</p>
+          </div>
+          <div style="background: #f9fafb; padding: 18px 36px; text-align: center;">
+            <p style="color: #9ca3af; font-size: 12px; margin: 0;">© ${new Date().getFullYear()} InvoiceEase. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error('Resend quotation email error:', error);
+      return { success: false, error };
+    }
+
+    return { success: true, data };
+  } catch (err) {
+    console.error('Failed to send quotation email:', err);
+    return { success: false, error: err.message };
+  }
+};
+
 module.exports = {
   sendWelcomeEmail,
   sendPlanUpgradeEmail,
   sendPasswordResetEmail,
+  sendPaymentReminderEmail,
+  sendQuotationEmail,
 };

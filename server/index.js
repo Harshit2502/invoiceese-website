@@ -10,6 +10,8 @@ const telegramRoutes = require('./routes/telegram');
 const paymentRoutes = require('./routes/payments');
 const productRoutes = require('./routes/products');
 const purchaseRoutes = require('./routes/purchases');
+const quotationRoutes = require('./routes/quotations');
+const { startReminderScheduler } = require('./services/reminder-scheduler');
 
 // PostgreSQL initialization (optional - disabled by default)
 if (process.env.USE_POSTGRES === 'true' && (process.env.DATABASE_URL || process.env.DB_HOST)) {
@@ -78,6 +80,7 @@ app.use('/api/telegram', telegramRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/purchases', purchaseRoutes);
+app.use('/api/quotations', quotationRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -86,4 +89,9 @@ app.get('/api/health', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 InvoiceEase server running on http://localhost:${PORT}`);
+  startReminderScheduler();
 });
+
+// trigger nodemon reload
+
+// reload again

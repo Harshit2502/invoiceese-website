@@ -14,6 +14,9 @@ export default function SettingsScreen({ user, setUser, authFetch }) {
     gstNumber: user?.gstNumber || '',
     state: user?.state || '',
     stateCode: user?.stateCode || '',
+    defaultDueDays: user?.defaultDueDays || 30,
+    defaultRemindOnDays: user?.defaultRemindOnDays || [1, 3, 7, 14],
+    defaultReminderChannels: user?.defaultReminderChannels || ['email'],
   });
 
   const [settingsError, setSettingsError] = useState('');
@@ -88,13 +91,24 @@ export default function SettingsScreen({ user, setUser, authFetch }) {
         nextLogoUrl = uploadData.logoUrl || nextLogoUrl;
       }
 
+      const parseRemindOnDays = (val) => {
+        if (Array.isArray(val)) return val;
+        return String(val)
+          .split(',')
+          .map(n => parseInt(n.trim(), 10))
+          .filter(Number.isFinite);
+      };
+
       const profileRes = await authFetch('/api/users/profile', {
         method: 'PATCH',
         body: JSON.stringify({ 
           logoUrl: nextLogoUrl,
           gstNumber: settingsForm.gstNumber,
           state: settingsForm.state,
-          stateCode: settingsForm.stateCode
+          stateCode: settingsForm.stateCode,
+          defaultDueDays: Number(settingsForm.defaultDueDays),
+          defaultRemindOnDays: parseRemindOnDays(settingsForm.defaultRemindOnDays),
+          defaultReminderChannels: settingsForm.defaultReminderChannels
         }),
       });
       const profileData = await profileRes.json();
@@ -205,6 +219,51 @@ export default function SettingsScreen({ user, setUser, authFetch }) {
                   <button type="button" onClick={removeLogo} style={{ padding: '6px 12px', background: '#fef2f2', color: '#b91c1c', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 500 }}>Remove</button>
                 </div>
               )}
+            </div>
+
+            {/* Payment Reminder Defaults Section */}
+            <div style={{ paddingTop: 20, borderTop: "1px solid #e5e7eb", marginTop: 10 }}>
+              <h4 style={{ fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 12 }}>Payment Reminder Defaults</h4>
+              
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Default Due Date (days from creation)</label>
+                <input type="number" style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} value={settingsForm.defaultDueDays} onChange={(e) => setSettingsForm(f => ({ ...f, defaultDueDays: e.target.value }))} placeholder="e.g. 30" />
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Default Reminder Schedule (days after due date, comma-separated)</label>
+                <input type="text" style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }} value={Array.isArray(settingsForm.defaultRemindOnDays) ? settingsForm.defaultRemindOnDays.join(', ') : settingsForm.defaultRemindOnDays} onChange={(e) => setSettingsForm(f => ({ ...f, defaultRemindOnDays: e.target.value }))} placeholder="e.g. 1, 3, 7, 14" />
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Default Notification Channels</label>
+                <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={settingsForm.defaultReminderChannels.includes('email')} onChange={(e) => {
+                      const checked = e.target.checked;
+                      setSettingsForm(f => {
+                        const channels = checked 
+                          ? [...f.defaultReminderChannels, 'email']
+                          : f.defaultReminderChannels.filter(c => c !== 'email');
+                        return { ...f, defaultReminderChannels: channels };
+                      });
+                    }} style={{ marginRight: 6 }} />
+                    Email
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={settingsForm.defaultReminderChannels.includes('whatsapp')} onChange={(e) => {
+                      const checked = e.target.checked;
+                      setSettingsForm(f => {
+                        const channels = checked 
+                          ? [...f.defaultReminderChannels, 'whatsapp']
+                          : f.defaultReminderChannels.filter(c => c !== 'whatsapp');
+                        return { ...f, defaultReminderChannels: channels };
+                      });
+                    }} style={{ marginRight: 6 }} />
+                    WhatsApp
+                  </label>
+                </div>
+              </div>
             </div>
 
             <div style={{ paddingTop: 20, borderTop: "1px solid #e5e7eb", marginTop: 10 }}>

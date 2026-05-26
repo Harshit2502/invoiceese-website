@@ -6,7 +6,8 @@ import { Link } from "react-router-dom";
 import {
   LayoutDashboard, FileText, Upload, Package, BarChart2,
   TrendingUp, TrendingDown, Plus, Eye, ChevronRight,
-  ChevronLeft, CheckCircle, AlertCircle, Database, Settings, LogOut, Trash2, Search, Menu, X, Download
+  ChevronLeft, CheckCircle, AlertCircle, Database, Settings, LogOut, Trash2, Search, Menu, X, Download,
+  Bell, Calendar, MessageSquare, ExternalLink, RefreshCw, Send
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
@@ -147,7 +148,7 @@ function BottomNav({ screen, setScreen, setShowCreate }) {
   );
 }
 
-function Dashboard({ setScreen, user, stats, monthData, recentInvoices }) {
+function Dashboard({ setScreen, user, stats, monthData, recentInvoices, invoices, handleSendBulkReminders, sendingBulk }) {
   const sortedMonthData = useMemo(() => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return [...monthData].sort((a, b) => {
@@ -171,6 +172,66 @@ function Dashboard({ setScreen, user, stats, monthData, recentInvoices }) {
           {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
         </button>
       </div>
+
+      {/* Outstanding Summary Widget */}
+      {(() => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const overdueInvoices = invoices.filter(inv => 
+          inv.docType === 'sales_invoice' && 
+          inv.paymentStatus !== 'paid' && 
+          inv.status !== 'paid' &&
+          inv.dueDate && 
+          inv.dueDate < todayStr
+        );
+        const totalOverdueAmount = overdueInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || inv.amount || 0), 0);
+        const overdueCount = overdueInvoices.length;
+        const oldestUnpaid = overdueInvoices.reduce((oldest, inv) => {
+          if (!oldest) return inv;
+          return inv.dueDate < oldest.dueDate ? inv : oldest;
+        }, null);
+
+        return overdueCount > 0 ? (
+          <div className="card" style={{ marginBottom: 22, background: '#FFFDF5', border: '1px solid #FAC775', borderRadius: 12, padding: '20px 24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
+              <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+                <div style={{ fontSize: 24, background: '#FEF3C7', padding: 10, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🔔</div>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#B45309', textTransform: 'uppercase', letterSpacing: 0.5 }}>Outstanding Payments</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: '#78350F', marginTop: 4, display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                    <span>₹{totalOverdueAmount.toLocaleString()}</span>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: '#D97706' }}>({overdueCount} overdue invoices)</span>
+                  </div>
+                  {oldestUnpaid && (
+                    <div style={{ fontSize: 11, color: '#B45309', marginTop: 4 }}>
+                      Oldest unpaid: <strong>#{oldestUnpaid.invoiceNumber}</strong> (due {safeFormatDate(oldestUnpaid.dueDate)})
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <button 
+                  className="btn" 
+                  onClick={handleSendBulkReminders} 
+                  disabled={sendingBulk}
+                  style={{ background: '#D97706', color: '#fff', fontWeight: 600, padding: '9px 18px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 4px 10px rgba(217,119,6,0.15)' }}
+                >
+                  <Bell size={14} /> {sendingBulk ? 'Sending...' : 'Send Bulk Reminders'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="card" style={{ marginBottom: 22, background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 12, padding: '16px 24px' }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <div style={{ fontSize: 20, background: '#DCFCE7', padding: 8, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✅</div>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#166534', textTransform: 'uppercase', letterSpacing: 0.5 }}>Outstanding Payments</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#14532D', marginTop: 2 }}>All outbound invoices are fully paid!</div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="stats-grid">
         <div className="stat-card accent">
@@ -262,22 +323,29 @@ function Dashboard({ setScreen, user, stats, monthData, recentInvoices }) {
   );
 }
 
-function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoiceStatus, statusUpdating, deleteInvoice, handleExportCSV }) {
+function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoiceStatus, statusUpdating, deleteInvoice, handleExportCSV, handleViewDocDetails }) {
   const [filter, setFilter] = useState('all');
 
   const allDocs = useMemo(() => {
-    const s = invoices.map(inv => ({
-      id: inv.id,
-      sysType: 'sale',
-      type: inv.docType || 'sales_invoice',
-      no: inv.invoiceNumber,
-      party: inv.clientName,
-      date: safeFormatDate(inv.date || inv.createdAt),
-      amount: `₹${Number(inv.totalAmount || inv.amount).toLocaleString()}`,
-      status: inv.status === 'paid' ? 'Paid' : 'Pending',
-      url: inv.pdfUrl,
-      ts: safeGetTime(inv.createdAt || inv.date)
-    }));
+    const s = invoices.map(inv => {
+      const isQuoteOrProforma = ['quotation', 'proforma'].includes(inv.docType);
+      return {
+        id: inv.id,
+        sysType: 'sale',
+        type: inv.docType || 'sales_invoice',
+        no: inv.invoiceNumber,
+        party: inv.clientName,
+        date: safeFormatDate(inv.date || inv.createdAt),
+        amount: `₹${Number(inv.totalAmount || inv.amount).toLocaleString()}`,
+        status: isQuoteOrProforma ? (inv.quoteStatus || 'draft') : (inv.status === 'paid' ? 'Paid' : 'Pending'),
+        convertedInvoiceId: inv.convertedInvoiceId,
+        dueDate: inv.dueDate,
+        clientEmail: inv.clientEmail,
+        clientMobile: inv.clientMobile,
+        url: inv.pdfUrl,
+        ts: safeGetTime(inv.createdAt || inv.date)
+      };
+    });
 
     const p = purchases.map(inv => ({
       id: inv.id,
@@ -305,6 +373,8 @@ function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoi
       'debit_note': { cls: 'badge-debit-note', label: 'Debit Note' },
       'delivery_challan': { cls: 'badge-challan', label: 'Delivery Challan' },
       'provisional_invoice': { cls: 'badge-provisional', label: 'Provisional Bill' },
+      'quotation': { cls: 'badge-quotation', label: 'Quotation' },
+      'proforma': { cls: 'badge-proforma', label: 'Proforma Invoice' },
     };
     return map[type] || { cls: 'badge-sale', label: type };
   };
@@ -340,7 +410,7 @@ function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoi
         </div>
       </div>
 
-      <div className="doc-type-grid">
+      <div className="doc-type-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
         <div className={`doc-type-card ${filter === 'all' ? 'selected' : ''}`} onClick={() => setFilter('all')}>
           <div className="doc-type-icon" style={{ background: 'var(--green-l)', fontSize: 18 }}>📋</div>
           <div>
@@ -363,6 +433,22 @@ function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoi
             <div className="doc-type-label">Purchase Invoice</div>
             <div className="doc-type-desc">Received from your wholesalers</div>
             <div className="doc-type-count">{docCounts['purchase_invoice'] || 0} documents</div>
+          </div>
+        </div>
+        <div className={`doc-type-card ${filter === 'quotation' ? 'selected' : ''}`} onClick={() => setFilter('quotation')}>
+          <div className="doc-type-icon" style={{ background: '#E0F2FE', fontSize: 18 }}>📄</div>
+          <div>
+            <div className="doc-type-label">Quotation</div>
+            <div className="doc-type-desc">Pre-tax customer estimates</div>
+            <div className="doc-type-count">{docCounts['quotation'] || 0} documents</div>
+          </div>
+        </div>
+        <div className={`doc-type-card ${filter === 'proforma' ? 'selected' : ''}`} onClick={() => setFilter('proforma')}>
+          <div className="doc-type-icon" style={{ background: '#F3E8FF', fontSize: 18 }}>📑</div>
+          <div>
+            <div className="doc-type-label">Proforma Invoice</div>
+            <div className="doc-type-desc">Draft invoice with tax estimation</div>
+            <div className="doc-type-count">{docCounts['proforma'] || 0} documents</div>
           </div>
         </div>
         <div className={`doc-type-card ${filter === 'credit_note' ? 'selected' : ''}`} onClick={() => setFilter('credit_note')}>
@@ -409,16 +495,53 @@ function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoi
             {filteredDocs.map((r, i) => {
               const badgeInfo = getDocBadge(r.type);
               return (
-                <tr key={i}>
+                <tr key={i} onClick={() => handleViewDocDetails(r)} style={{ cursor: 'pointer' }}>
                   <td><span className={`doc-type-badge ${badgeInfo.cls}`}>{badgeInfo.label}</span></td>
                   <td style={{ fontWeight: 500 }}>{r.party}</td>
                   <td style={{ color: 'var(--ink3)', fontSize: 12 }}>{r.no}</td>
                   <td style={{ color: 'var(--ink3)' }}>{r.date}</td>
                   <td style={{ fontWeight: 600 }}>{r.amount}</td>
                   <td style={{ fontSize: 12 }}>
-                    {r.sysType === 'sale' ? (
+                    {['quotation', 'proforma'].includes(r.type) ? (
+                      (() => {
+                        const statusMap = {
+                          draft: { label: 'Draft', bg: '#f3f4f6', color: '#374151' },
+                          sent: { label: 'Sent', bg: '#dbeafe', color: '#1e40af' },
+                          accepted: { label: 'Accepted', bg: '#d1fae5', color: '#065f46' },
+                          rejected: { label: 'Rejected', bg: '#fee2e2', color: '#991b1b' },
+                          converted: { label: 'Converted', bg: '#f3e8ff', color: '#6b21a8' },
+                        };
+                        const config = statusMap[String(r.status).toLowerCase()] || { label: r.status, bg: '#f3f4f6', color: '#374151' };
+                        const convertedInv = invoices.find(inv => inv.id === r.convertedInvoiceId);
+                        return (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <span 
+                              style={{ padding: "3px 10px", borderRadius: 12, fontWeight: 600, background: config.bg, color: config.color, display: 'inline-block' }}
+                            >
+                              {config.label}
+                            </span>
+                            {String(r.status).toLowerCase() === 'converted' && convertedInv && (
+                              <span 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const targetDoc = allDocs.find(d => d.id === convertedInv.id);
+                                  if (targetDoc) handleViewDocDetails(targetDoc);
+                                }}
+                                style={{ color: '#6b21a8', textDecoration: 'underline', cursor: 'pointer', fontSize: 11, fontWeight: 500 }}
+                                title="Click to view converted invoice"
+                              >
+                                #{convertedInv.invoiceNumber}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()
+                    ) : r.sysType === 'sale' ? (
                       <button 
-                        onClick={() => updateInvoiceStatus(r.id, r.status === 'Paid' ? 'pending' : 'paid')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          updateInvoiceStatus(r.id, r.status === 'Paid' ? 'pending' : 'paid');
+                        }}
                         disabled={statusUpdating === r.id}
                         title="Click to toggle status"
                         style={{ border: "none", cursor: statusUpdating === r.id ? "wait" : "pointer", fontSize: 11, padding: "3px 10px", borderRadius: 12, fontWeight: 500, background: r.status === "Paid" ? "#d1fae5" : "#fef2f2", color: r.status === "Paid" ? "#065f46" : "#b45309" }}
@@ -434,19 +557,26 @@ function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoi
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: "inline-flex", gap: 10, alignItems: "center" }}>
                       {r.url ? (
-                        <a href={r.url} target="_blank" rel="noreferrer" style={{ color: "var(--ink3)" }} title="View PDF"><Eye size={16} /></a>
+                        <a href={r.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "var(--ink3)" }} title="View PDF"><Eye size={16} /></a>
                       ) : (
                         <Eye size={16} style={{ color: "var(--border)" }} />
                       )}
                       {r.sysType === "sale" && (
-                        <button onClick={() => deleteInvoice(r.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", padding: 0 }} title="Delete Document">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteInvoice(r.id);
+                          }} 
+                          style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", padding: 0 }} 
+                          title="Delete Document"
+                        >
                           <Trash2 size={16} />
                         </button>
                       )}
                     </div>
                   </td>
                 </tr>
-              )
+              );
             })}
             {filteredDocs.length === 0 && (
               <tr>
@@ -1392,6 +1522,8 @@ export default function LedgerDashboard() {
   const [showCreate, setShowCreate] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(null);
+  const [sendingBulk, setSendingBulk] = useState(false);
+  const [viewingDoc, setViewingDoc] = useState(null);
 
   const [invoices, setInvoices] = useState([]);
   const [purchases, setPurchases] = useState([]);
@@ -1399,6 +1531,25 @@ export default function LedgerDashboard() {
   const [loading, setLoading] = useState(true);
   const [extractedData, setExtractedData] = useState(null);
   const [extractedImage, setExtractedImage] = useState(null);
+
+  const handleSendBulkReminders = async () => {
+    if (!window.confirm('Send payment reminders to all overdue clients?')) return;
+    setSendingBulk(true);
+    try {
+      const res = await authFetch('/api/invoices/reminders/bulk', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Bulk payment reminders sent successfully!');
+      } else {
+        alert('Failed to send bulk reminders: ' + (data.error || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error sending bulk reminders');
+    } finally {
+      setSendingBulk(false);
+    }
+  };
 
   const fetchInvoices = async () => {
     try {
@@ -1613,8 +1764,31 @@ export default function LedgerDashboard() {
           </div>
 
           <div className="content">
-            {screen === 0 && <Dashboard setScreen={setScreen} user={user} stats={stats} monthData={monthData} recentInvoices={recentInvoices} />}
-            {screen === 1 && <InvoiceHub setScreen={setScreen} invoices={invoices} purchases={purchases} setShowCreate={setShowCreate} updateInvoiceStatus={updateInvoiceStatus} statusUpdating={statusUpdating} deleteInvoice={deleteInvoice} handleExportCSV={handleExportCSV} />}
+            {screen === 0 && (
+              <Dashboard 
+                setScreen={setScreen} 
+                user={user} 
+                stats={stats} 
+                monthData={monthData} 
+                recentInvoices={recentInvoices} 
+                invoices={invoices}
+                handleSendBulkReminders={handleSendBulkReminders}
+                sendingBulk={sendingBulk}
+              />
+            )}
+            {screen === 1 && (
+              <InvoiceHub 
+                setScreen={setScreen} 
+                invoices={invoices} 
+                purchases={purchases} 
+                setShowCreate={setShowCreate} 
+                updateInvoiceStatus={updateInvoiceStatus} 
+                statusUpdating={statusUpdating} 
+                deleteInvoice={deleteInvoice} 
+                handleExportCSV={handleExportCSV} 
+                handleViewDocDetails={setViewingDoc}
+              />
+            )}
             {screen === 2 && <UploadInvoice setScreen={setScreen} authFetch={authFetch} setExtractedData={setExtractedData} setExtractedImage={setExtractedImage} />}
             {screen === 3 && <ReviewExtraction setScreen={setScreen} extractedData={extractedData} extractedImage={extractedImage} authFetch={authFetch} fetchInvoices={fetchInvoices} fetchPurchases={fetchPurchases} fetchProducts={fetchProducts} />}
             {screen === 4 && <Analytics products={products} stats={stats} handleExportCSV={handleExportCSV} />}
@@ -1625,6 +1799,491 @@ export default function LedgerDashboard() {
         
         <BottomNav screen={screen} setScreen={setScreen} setShowCreate={setShowCreate} />
         {showCreate && <CreateInvoiceModal onClose={() => setShowCreate(false)} onSuccess={() => { fetchInvoices(); fetchProducts(); }} user={user} />}
+        {viewingDoc && (
+          <DocumentDetailModal 
+            onClose={() => setViewingDoc(null)} 
+            doc={viewingDoc} 
+            user={user} 
+            authFetch={authFetch} 
+            refreshInvoices={fetchInvoices} 
+            invoices={invoices}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DocumentDetailModal({ onClose, doc, user, authFetch, refreshInvoices, invoices }) {
+  const isQuoteOrProforma = ['quotation', 'proforma'].includes(doc.type);
+  const isSaleInvoice = doc.sysType === 'sale' && !isQuoteOrProforma;
+
+  const [activeTab, setActiveTab] = useState('details'); // 'details' or 'reminders'
+  const [loading, setLoading] = useState(false);
+  const [reminderConfig, setReminderConfig] = useState(null);
+  const [reminderLogs, setReminderLogs] = useState([]);
+  
+  // Local state for reminder settings
+  const [remindersEnabled, setRemindersEnabled] = useState(true);
+  const [channels, setChannels] = useState(['email']);
+  const [remindDaysStr, setRemindDaysStr] = useState('1,3,7,14');
+  const [dueDate, setDueDate] = useState('');
+  const [savingReminder, setSavingReminder] = useState(false);
+  
+  // Quotation status/sending state
+  const [quoteStatus, setQuoteStatus] = useState(doc.status || 'draft');
+  const [clientEmail, setClientEmail] = useState(doc.clientEmail || '');
+  const [clientMobile, setClientMobile] = useState(doc.clientMobile || '');
+  const [sendingQuote, setSendingQuote] = useState(false);
+  const [convertingQuote, setConvertingQuote] = useState(false);
+
+  useEffect(() => {
+    if (isSaleInvoice) {
+      // Fetch reminder configuration
+      const fetchReminder = async () => {
+        setLoading(true);
+        try {
+          const res = await authFetch(`/api/invoices/${doc.id}/reminder`);
+          if (res.ok) {
+            const data = await res.json();
+            setReminderConfig(data.config);
+            setReminderLogs(data.logs || []);
+            
+            // Sync local state
+            setChannels(data.config?.channels || []);
+            setRemindersEnabled((data.config?.channels || []).length > 0);
+            setRemindDaysStr((data.config?.remindOnDays || []).join(','));
+          }
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchReminder();
+    }
+    
+    // Set default fields from doc details
+    if (doc.dueDate) {
+      setDueDate(standardizeDateForInput(doc.dueDate));
+    } else {
+      setDueDate('');
+    }
+    setQuoteStatus(doc.status || 'draft');
+    setClientEmail(doc.clientEmail || '');
+    setClientMobile(doc.clientMobile || '');
+  }, [doc, isSaleInvoice, authFetch]);
+
+  // Handle due date update
+  const handleSaveDueDate = async () => {
+    try {
+      const res = await authFetch(`/api/invoices/${doc.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ dueDate })
+      });
+      if (res.ok) {
+        alert('Due date updated successfully!');
+        refreshInvoices();
+      } else {
+        const data = await res.json();
+        alert('Failed to update due date: ' + data.error);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error updating due date');
+    }
+  };
+
+  // Handle reminder config save
+  const handleSaveReminders = async (e) => {
+    e.preventDefault();
+    setSavingReminder(true);
+    const parsedDays = remindDaysStr.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+    const activeChannels = remindersEnabled ? channels : [];
+    
+    try {
+      const res = await authFetch(`/api/invoices/${doc.id}/reminder`, {
+        method: 'POST',
+        body: JSON.stringify({
+          remindOnDays: parsedDays,
+          channels: activeChannels
+        })
+      });
+      if (res.ok) {
+        alert('Reminder settings saved successfully!');
+        refreshInvoices();
+      } else {
+        const data = await res.json();
+        alert('Failed to save reminder settings: ' + data.error);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error saving reminder settings');
+    } finally {
+      setSavingReminder(false);
+    }
+  };
+
+  // Handle quotation status change
+  const handleUpdateQuoteStatus = async (newStatus) => {
+    try {
+      const res = await authFetch(`/api/quotations/${doc.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ quoteStatus: newStatus })
+      });
+      if (res.ok) {
+        setQuoteStatus(newStatus);
+        alert(`Status updated to ${newStatus}`);
+        refreshInvoices();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Handle quotation sending
+  const handleSendQuote = async () => {
+    setSendingQuote(true);
+    try {
+      const res = await authFetch(`/api/quotations/${doc.id}/send`, {
+        method: 'POST',
+        body: JSON.stringify({ email: clientEmail, whatsapp: clientMobile })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Quotation dispatched successfully!');
+        setQuoteStatus('sent');
+        refreshInvoices();
+      } else {
+        alert('Failed to send quotation: ' + data.error);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error sending quotation');
+    } finally {
+      setSendingQuote(false);
+    }
+  };
+
+  // Handle convert quotation to invoice
+  const handleConvertQuote = async () => {
+    if (!window.confirm('Are you sure you want to convert this quotation into a Sales Invoice? This will generate a new invoice number sequence and copy all items.')) return;
+    setConvertingQuote(true);
+    try {
+      const res = await authFetch(`/api/quotations/${doc.id}/convert`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`Quotation successfully converted to Invoice #${data.invoiceNumber}!`);
+        refreshInvoices();
+        onClose();
+      } else {
+        alert('Conversion failed: ' + data.error);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error converting quotation');
+    } finally {
+      setConvertingQuote(false);
+    }
+  };
+
+  // Render scheduled reminders timeline
+  const renderFutureReminders = () => {
+    if (!dueDate || !remindDaysStr) return null;
+    const parsedDays = remindDaysStr.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+    const invDueDate = new Date(dueDate);
+    
+    return parsedDays.map(days => {
+      const remindDate = new Date(invDueDate);
+      remindDate.setDate(remindDate.getDate() + days);
+      const isPast = remindDate < new Date();
+      return {
+        days,
+        date: remindDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        isPast
+      };
+    }).sort((a,b) => a.days - b.days);
+  };
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+      <div style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 750, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+        {/* Header */}
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 10 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18, color: '#111827', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span>{isQuoteOrProforma ? (doc.type === 'quotation' ? 'Quotation' : 'Proforma Invoice') : (doc.sysType === 'purchase' ? 'Purchase Invoice' : 'Sales Invoice')} Details</span>
+              <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 10, background: '#f3f4f6', color: '#4b5563' }}>#{doc.no}</span>
+            </h2>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#6b7280' }}>&times;</button>
+        </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+          {/* Left panel: Info */}
+          <div style={{ flex: '1 1 320px', padding: 24, borderRight: '1px solid #e5e7eb' }}>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', marginBottom: 6 }}>{doc.sysType === 'purchase' ? 'Supplier Details' : 'Client Details'}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>{doc.party}</div>
+              <div style={{ fontSize: 13, color: '#4b5563', marginTop: 4 }}>Date: {doc.date}</div>
+              {doc.dueDate && <div style={{ fontSize: 13, color: '#4b5563', marginTop: 2 }}>Due Date: {safeFormatDate(doc.dueDate)}</div>}
+            </div>
+
+            <div style={{ marginBottom: 24, padding: 16, background: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase' }}>Amount</span>
+              <div style={{ fontSize: 24, fontWeight: 700, color: '#0F6E56', marginTop: 4 }}>{doc.amount}</div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
+              {doc.url ? (
+                <a href={doc.url} target="_blank" rel="noreferrer" className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center', textDecoration: 'none', gap: 6, fontSize: 13, display: 'inline-flex', alignItems: 'center' }}>
+                  <Eye size={14} /> View PDF
+                </a>
+              ) : (
+                <span style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic' }}>PDF not generated</span>
+              )}
+            </div>
+
+            {/* Quotation Convert CTA */}
+            {isQuoteOrProforma && quoteStatus.toLowerCase() === 'accepted' && (
+              <div style={{ marginTop: 20 }}>
+                <button 
+                  onClick={handleConvertQuote}
+                  disabled={convertingQuote}
+                  className="btn"
+                  style={{ background: '#7c3aed', color: '#fff', width: '100%', justifyContent: 'center', fontWeight: 600, padding: '12px 20px', border: 'none', borderRadius: 8, cursor: 'pointer', boxShadow: '0 4px 12px rgba(124,58,237,0.25)' }}
+                >
+                  {convertingQuote ? 'Converting...' : '⚡ Convert to Sales Invoice'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Right panel: Controls */}
+          <div style={{ flex: '1 1 350px', padding: 24 }}>
+            {isSaleInvoice ? (
+              // INVOICE REMINDERS AND DUE DATE TAB
+              <div>
+                <div className="pill-tabs" style={{ marginBottom: 20 }}>
+                  <button className={`pill-tab ${activeTab === 'details' ? 'active' : ''}`} onClick={() => setActiveTab('details')}>Due Date</button>
+                  <button className={`pill-tab ${activeTab === 'reminders' ? 'active' : ''}`} onClick={() => setActiveTab('reminders')}>Payment Reminders</button>
+                </div>
+
+                {activeTab === 'details' && (
+                  <div>
+                    <div style={{ marginBottom: 20 }}>
+                      <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Due Date</label>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input 
+                          type="date" 
+                          value={dueDate} 
+                          onChange={(e) => setDueDate(e.target.value)} 
+                          style={{ flex: 1, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, outline: 'none' }}
+                        />
+                        <button onClick={handleSaveDueDate} className="btn btn-primary" style={{ padding: '8px 14px' }}>Save</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'reminders' && (
+                  <div>
+                    {loading ? (
+                      <div style={{ color: 'var(--ink3)', fontSize: 13 }}>Loading reminder config...</div>
+                    ) : (
+                      <form onSubmit={handleSaveReminders}>
+                        <div style={{ marginBottom: 16 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={remindersEnabled} 
+                              onChange={(e) => setRemindersEnabled(e.target.checked)} 
+                              style={{ marginRight: 8 }}
+                            />
+                            Enable Automatic Reminders
+                          </label>
+                        </div>
+
+                        {remindersEnabled && (
+                          <>
+                            <div style={{ marginBottom: 16 }}>
+                              <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Channels</label>
+                              <div style={{ display: 'flex', gap: 16 }}>
+                                <label style={{ display: 'flex', alignItems: 'center', fontSize: 13, color: '#4b5563', cursor: 'pointer' }}>
+                                  <input 
+                                    type="checkbox" 
+                                    checked={channels.includes('email')} 
+                                    onChange={(e) => {
+                                      if (e.target.checked) setChannels([...channels, 'email']);
+                                      else setChannels(channels.filter(c => c !== 'email'));
+                                    }}
+                                    style={{ marginRight: 6 }}
+                                  />
+                                  Email
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', fontSize: 13, color: '#4b5563', cursor: 'pointer' }}>
+                                  <input 
+                                    type="checkbox" 
+                                    checked={channels.includes('whatsapp')} 
+                                    onChange={(e) => {
+                                      if (e.target.checked) setChannels([...channels, 'whatsapp']);
+                                      else setChannels(channels.filter(c => c !== 'whatsapp'));
+                                    }}
+                                    style={{ marginRight: 6 }}
+                                  />
+                                  WhatsApp
+                                </label>
+                              </div>
+                            </div>
+
+                            <div style={{ marginBottom: 16 }}>
+                              <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Reminder Schedule (Days after due date)</label>
+                              <input 
+                                type="text" 
+                                value={remindDaysStr} 
+                                onChange={(e) => setRemindDaysStr(e.target.value)} 
+                                placeholder="1,3,7,14" 
+                                style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, outline: 'none' }}
+                              />
+                              <small style={{ color: '#6b7280', display: 'block', marginTop: 4 }}>Comma-separated numbers (e.g. 1,3,7 means remind 1, 3, and 7 days after due date)</small>
+                            </div>
+                          </>
+                        )}
+
+                        <button type="submit" disabled={savingReminder} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '10px 16px', marginBottom: 20 }}>
+                          {savingReminder ? 'Saving...' : 'Save Reminder Settings'}
+                        </button>
+
+                        {/* Reminders Timeline */}
+                        <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
+                          <h4 style={{ margin: '0 0 10px 0', fontSize: 13, color: '#374151', fontWeight: 600 }}>Reminder Timeline</h4>
+                          
+                          {/* Future triggers */}
+                          {remindersEnabled && renderFutureReminders() && (
+                            <div style={{ marginBottom: 16 }}>
+                              <div style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', marginBottom: 6 }}>Scheduled triggers</div>
+                              {renderFutureReminders().map((item, idx) => (
+                                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed #f3f4f6', fontSize: 12, color: item.isPast ? '#9ca3af' : '#374151' }}>
+                                  <span>remind on day {item.days}</span>
+                                  <span>{item.date} {item.isPast && '(passed)'}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Past Logs */}
+                          {reminderLogs.length > 0 ? (
+                            <div>
+                              <div style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', marginBottom: 6 }}>Sent logs</div>
+                              {reminderLogs.map((log, idx) => (
+                                <div key={idx} style={{ padding: '6px 0', fontSize: 12, borderBottom: '1px solid #f3f4f6' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
+                                    <span style={{ color: log.status === 'success' ? '#059669' : '#dc2626', textTransform: 'capitalize' }}>
+                                      ● {log.channel} {log.status}
+                                    </span>
+                                    <span style={{ color: '#6b7280' }}>{new Date(log.sentAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                                  </div>
+                                  <div style={{ color: '#6b7280', fontSize: 11, marginTop: 2 }}>Sent to: {log.sentTo}</div>
+                                  {log.errorMessage && <div style={{ color: '#dc2626', fontSize: 11, marginTop: 2 }}>Error: {log.errorMessage}</div>}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic' }}>No reminders sent yet.</div>
+                          )}
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : isQuoteOrProforma ? (
+              // QUOTATION/PROFORMA ACTIONS
+              <div>
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ display: 'block', marginBottom: 8, fontSize: 13, fontWeight: 600, color: '#374151' }}>Status</label>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {['draft', 'sent', 'accepted', 'rejected'].map(st => {
+                      const isActive = quoteStatus.toLowerCase() === st;
+                      const activeStyles = {
+                        draft: { bg: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db' },
+                        sent: { bg: '#dbeafe', color: '#1e40af', border: '1px solid #93c5fd' },
+                        accepted: { bg: '#d1fae5', color: '#065f46', border: '1px solid #6ee7b7' },
+                        rejected: { bg: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5' },
+                      }[st];
+                      
+                      return (
+                        <button 
+                          key={st}
+                          type="button"
+                          onClick={() => handleUpdateQuoteStatus(st)}
+                          className="btn"
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: 12,
+                            borderRadius: 16,
+                            background: isActive ? activeStyles.bg : '#fff',
+                            color: isActive ? activeStyles.color : '#4b5563',
+                            border: isActive ? activeStyles.border : '1px solid #d1d5db',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {st.charAt(0).toUpperCase() + st.slice(1)}
+                        </button>
+                      );
+                    })}
+                    {quoteStatus.toLowerCase() === 'converted' && (
+                      <span style={{ padding: '6px 12px', borderRadius: 16, background: '#f3e8ff', color: '#6b21a8', border: '1px solid #d8b4fe', fontWeight: 600, fontSize: 12 }}>Converted</span>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 20 }}>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: 13, color: '#374151', fontWeight: 600 }}>Send document to client</h4>
+                  
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ display: 'block', marginBottom: 6, fontSize: 12, color: '#4b5563' }}>Client Email</label>
+                    <input 
+                      type="email" 
+                      value={clientEmail} 
+                      onChange={(e) => setClientEmail(e.target.value)} 
+                      placeholder="client@example.com" 
+                      style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, outline: 'none' }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', marginBottom: 6, fontSize: 12, color: '#4b5563' }}>Client Mobile (WhatsApp)</label>
+                    <input 
+                      type="text" 
+                      value={clientMobile} 
+                      onChange={(e) => setClientMobile(e.target.value)} 
+                      placeholder="9876543210" 
+                      style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, outline: 'none' }}
+                    />
+                  </div>
+
+                  <button 
+                    onClick={handleSendQuote} 
+                    disabled={sendingQuote} 
+                    className="btn btn-primary" 
+                    style={{ width: '100%', justifyContent: 'center', padding: '10px 16px', display: 'flex', gap: 6, fontSize: 13 }}
+                  >
+                    <Send size={14} /> {sendingQuote ? 'Sending...' : 'Send Document'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // PURCHASE INVOICE DETAILS
+              <div>
+                <span style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic' }}>Buy-side documents do not support payment reminders.</span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
