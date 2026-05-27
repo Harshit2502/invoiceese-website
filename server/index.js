@@ -11,6 +11,7 @@ const paymentRoutes = require('./routes/payments');
 const productRoutes = require('./routes/products');
 const purchaseRoutes = require('./routes/purchases');
 const quotationRoutes = require('./routes/quotations');
+const gstRoutes = require('./routes/gst');
 const { startReminderScheduler } = require('./services/reminder-scheduler');
 
 // PostgreSQL initialization (optional - disabled by default)
@@ -81,6 +82,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/quotations', quotationRoutes);
+app.use('/api/gst', gstRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

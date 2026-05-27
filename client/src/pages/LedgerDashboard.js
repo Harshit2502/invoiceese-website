@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import CreateInvoiceModal from "../components/CreateInvoiceModal";
 import SettingsScreen from "../components/SettingsScreen";
+import GstFilingAssistant from "../components/GstFilingAssistant";
 import { useAuth } from "../context/AuthContext";
 import { Link } from "react-router-dom";
 import {
   LayoutDashboard, FileText, Upload, Package, BarChart2,
   TrendingUp, TrendingDown, Plus, Eye, ChevronRight,
   ChevronLeft, CheckCircle, AlertCircle, Database, Settings, LogOut, Trash2, Search, Menu, X, Download,
-  Bell, Calendar, MessageSquare, ExternalLink, RefreshCw, Send
+  Bell, Calendar, MessageSquare, ExternalLink, RefreshCw, Send, ShieldCheck
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
@@ -60,6 +61,7 @@ function Sidebar({ screen, setScreen, user, logout, isSidebarOpen, setIsSidebarO
     { icon: Upload, label: "Upload Invoice", s: 2 },
     { type: 'divider', label: 'Manage' },
     { icon: Package, label: "Products & Stock", s: 6 },
+    { icon: ShieldCheck, label: "GST Filing Assistant", s: 7 },
     { icon: Settings, label: "Settings", s: 5 },
   ];
 
@@ -357,7 +359,8 @@ function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoi
       amount: `₹${Number(inv.total).toLocaleString()}`,
       status: inv.status,
       url: inv.pdfUrl,
-      ts: safeGetTime(inv.createdAt || inv.invoiceDate)
+      ts: safeGetTime(inv.createdAt || inv.invoiceDate),
+      itcEligibility: inv.itcEligibility || 'inputs'
     }));
 
     return [...s, ...p].sort((a, b) => b.ts - a.ts);
@@ -734,7 +737,27 @@ function UploadInvoice({ setScreen, authFetch, setExtractedData, setExtractedIma
           </div>
 
           <div style={{ fontSize: 12, color: 'var(--ink3)', textAlign: 'center', margin: '10px 0' }}>
-            or <button style={{ background: 'none', border: 'none', color: 'var(--green)', cursor: 'pointer', fontSize: 12, textDecoration: 'underline', fontFamily: "'DM Sans', sans-serif" }}>enter details manually</button>
+            or <button 
+              onClick={() => {
+                setExtractedData({
+                  docType: 'purchase_invoice',
+                  supplier: '',
+                  invoiceNo: '',
+                  date: new Date().toISOString().split('T')[0],
+                  gst: '',
+                  items: [],
+                  subtotal: 0,
+                  gstAmt: 0,
+                  total: 0,
+                  itcEligibility: 'inputs'
+                });
+                setExtractedImage(null);
+                setScreen(3);
+              }}
+              style={{ background: 'none', border: 'none', color: 'var(--green)', cursor: 'pointer', fontSize: 12, textDecoration: 'underline', fontFamily: "'DM Sans', sans-serif" }}
+            >
+              enter details manually
+            </button>
           </div>
 
           <div className="alert alert-warn">
@@ -771,6 +794,7 @@ function ReviewExtraction({ setScreen, extractedData, extractedImage, authFetch,
     subtotal: extractedData?.subtotal || 0,
     gstAmt: extractedData?.gstAmt || 0,
     total: extractedData?.total || 0,
+    itcEligibility: extractedData?.itcEligibility || 'inputs'
   });
 
   const [saved, setSaved] = useState(false);
@@ -878,16 +902,29 @@ function ReviewExtraction({ setScreen, extractedData, extractedImage, authFetch,
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             <div style={{ background: 'var(--cream)', padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Document Classification</div>
-            <div style={{ padding: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
-              <span style={{ color: "var(--ink3)", fontSize: 12, width: 90, flexShrink: 0 }}>Save As</span>
-              <select name="docType" value={form.docType} onChange={handleChange} style={{ flex: 1, border: "1px solid var(--border)", borderRadius: 6, padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: "#fff", outline: 'none' }}>
-                <option value="purchase_invoice">Purchase Invoice (Inbound Stock)</option>
-                <option value="sales_invoice">Sales Invoice (Outbound Stock)</option>
-                <option value="credit_note">Credit Note (Outbound Stock Return)</option>
-                <option value="debit_note">Debit Note (Outbound Stock Deduction)</option>
-                <option value="delivery_challan">Delivery Challan (Outbound)</option>
-                <option value="provisional_invoice">Provisional Invoice (Outbound)</option>
-              </select>
+            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                <span style={{ color: "var(--ink3)", fontSize: 12, width: 90, flexShrink: 0 }}>Save As</span>
+                <select name="docType" value={form.docType} onChange={handleChange} style={{ flex: 1, border: "1px solid var(--border)", borderRadius: 6, padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: "#fff", outline: 'none' }}>
+                  <option value="purchase_invoice">Purchase Invoice (Inbound Stock)</option>
+                  <option value="sales_invoice">Sales Invoice (Outbound Stock)</option>
+                  <option value="credit_note">Credit Note (Outbound Stock Return)</option>
+                  <option value="debit_note">Debit Note (Outbound Stock Deduction)</option>
+                  <option value="delivery_challan">Delivery Challan (Outbound)</option>
+                  <option value="provisional_invoice">Provisional Invoice (Outbound)</option>
+                </select>
+              </div>
+              {form.docType === 'purchase_invoice' && (
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', borderTop: '1px solid var(--border2)', paddingTop: 12 }}>
+                  <span style={{ color: "var(--ink3)", fontSize: 12, width: 90, flexShrink: 0 }}>ITC Type</span>
+                  <select name="itcEligibility" value={form.itcEligibility} onChange={handleChange} style={{ flex: 1, border: "1px solid var(--border)", borderRadius: 6, padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: "#fff", outline: 'none' }}>
+                    <option value="inputs">Inputs (Goods/Stock)</option>
+                    <option value="capital_goods">Capital Goods</option>
+                    <option value="input_services">Input Services</option>
+                    <option value="ineligible">Ineligible / Blocked Credit</option>
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 
@@ -990,7 +1027,44 @@ function ReviewExtraction({ setScreen, extractedData, extractedImage, authFetch,
   );
 }
 
-function Analytics({ products, stats, handleExportCSV }) {
+function Analytics({ products, invoices, purchases, handleExportCSV }) {
+  const [timeRange, setTimeRange] = useState('YTD'); // 'YTD', '3_months', '1_month'
+
+  const filteredData = useMemo(() => {
+    const now = new Date();
+    let cutoff = null;
+    if (timeRange === '3_months') {
+      cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 90);
+    } else if (timeRange === '1_month') {
+      cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 30);
+    } else {
+      // YTD: From January 1st of current year (2026)
+      cutoff = new Date(now.getFullYear(), 0, 1);
+    }
+
+    const filteredInvs = invoices.filter(inv => {
+      const dateVal = inv.date || inv.createdAt;
+      if (!dateVal) return false;
+      const d = new Date(dateVal);
+      return !isNaN(d.getTime()) && d >= cutoff;
+    });
+
+    const filteredPurchases = purchases.filter(p => {
+      const dateVal = p.invoiceDate || p.createdAt;
+      if (!dateVal) return false;
+      const d = new Date(dateVal);
+      return !isNaN(d.getTime()) && d >= cutoff;
+    });
+
+    const revenue = filteredInvs.reduce((sum, inv) => sum + Number(inv.totalAmount || inv.amount || 0), 0);
+    const cost = filteredPurchases.reduce((sum, p) => sum + Number(p.total || 0), 0);
+    const grossProfit = revenue - cost;
+
+    return { revenue, purchases: cost, grossProfit };
+  }, [invoices, purchases, timeRange]);
+
   const inventoryData = products.map(p => {
     const margin = p.sellingPrice > 0 ? Math.round(((p.sellingPrice - p.avgCost) / p.sellingPrice) * 100) : 0;
     return { name: p.name, remaining: p.stockQty, margin, bought: p.stockQty, sold: 0, pl: (p.sellingPrice - p.avgCost) * p.stockQty };
@@ -1008,9 +1082,24 @@ function Analytics({ products, stats, handleExportCSV }) {
             <Download size={14} /> Export Stocks (Excel)
           </button>
           <div className="pill-tabs">
-            <button className="pill-tab active">YTD</button>
-            <button className="pill-tab">Last 3 months</button>
-            <button className="pill-tab">This year</button>
+            <button 
+              className={`pill-tab ${timeRange === 'YTD' ? 'active' : ''}`}
+              onClick={() => setTimeRange('YTD')}
+            >
+              YTD
+            </button>
+            <button 
+              className={`pill-tab ${timeRange === '3_months' ? 'active' : ''}`}
+              onClick={() => setTimeRange('3_months')}
+            >
+              Last 3 months
+            </button>
+            <button 
+              className={`pill-tab ${timeRange === '1_month' ? 'active' : ''}`}
+              onClick={() => setTimeRange('1_month')}
+            >
+              1 month
+            </button>
           </div>
         </div>
       </div>
@@ -1018,10 +1107,10 @@ function Analytics({ products, stats, handleExportCSV }) {
       <div className="stats-grid" style={{ marginBottom: 20 }}>
         <div className="stat-card accent">
           <div className="stat-label">Gross Profit</div>
-          <div className="stat-value">₹{(stats.revenue - stats.purchases).toLocaleString()}</div>
+          <div className="stat-value">₹{filteredData.grossProfit.toLocaleString()}</div>
           <div className="stat-delta">
             <span style={{ background: 'rgba(255,255,255,.2)', color: '#fff', padding: '2px 7px', borderRadius: 4, fontSize: 11, fontWeight: 600 }}>
-              YTD Derived
+              {timeRange === 'YTD' ? 'YTD Derived' : timeRange === '3_months' ? '90 Days Derived' : '30 Days Derived'}
             </span>
           </div>
         </div>
@@ -1079,15 +1168,15 @@ function Analytics({ products, stats, handleExportCSV }) {
         </div>
 
         <div className="card">
-          <div className="card-title">GST summary <span>YTD</span></div>
+          <div className="card-title">GST summary <span>{timeRange === 'YTD' ? 'YTD' : timeRange === '3_months' ? 'Last 3 Months' : 'Last 1 Month'}</span></div>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border2)' }}>
               <span style={{ fontSize: 13, color: 'var(--ink2)' }}>Estimated Revenue</span>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>₹{stats.revenue.toLocaleString()}</span>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>₹{filteredData.revenue.toLocaleString()}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border2)' }}>
               <span style={{ fontSize: 13, color: 'var(--ink2)' }}>Estimated Purchases</span>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>₹{stats.purchases.toLocaleString()}</span>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>₹{filteredData.purchases.toLocaleString()}</span>
             </div>
             <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--terra-l)', borderRadius: 8, fontSize: 12, color: '#7C3A1A' }}>
               📅 Next GST filing due: <strong>20 Next Month</strong>
@@ -1689,7 +1778,9 @@ export default function LedgerDashboard() {
   };
 
   const stats = useMemo(() => {
-    const revenue = invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || inv.amount || 0), 0);
+    const revenue = invoices
+      .filter(inv => inv.docType === 'sales_invoice')
+      .reduce((sum, inv) => sum + Number(inv.totalAmount || inv.amount || 0), 0);
     const cost = purchases.reduce((sum, p) => sum + Number(p.total || 0), 0);
     const stockValue = products.reduce((sum, p) => sum + (Number(p.stockQty || 0) * Number(p.avgCost || 0)), 0);
     return { revenue, purchases: cost, stockValue };
@@ -1708,8 +1799,9 @@ export default function LedgerDashboard() {
 
   const monthData = useMemo(() => {
     const dataByMonth = {};
-    const process = (arr, key) => {
+    const process = (arr, key, isSales) => {
       arr.forEach(item => {
+        if (isSales && item.docType !== 'sales_invoice') return;
         const d = new Date(item.date || item.invoiceDate || item.createdAt);
         let m = 'Unknown';
         if (!isNaN(d.getTime())) {
@@ -1719,8 +1811,8 @@ export default function LedgerDashboard() {
         dataByMonth[m][key] += Number(item.totalAmount || item.amount || item.total || 0);
       });
     };
-    process(invoices, 'rev');
-    process(purchases, 'cost');
+    process(invoices, 'rev', true);
+    process(purchases, 'cost', false);
     if (dataByMonth['Unknown'] && dataByMonth['Unknown'].rev === 0 && dataByMonth['Unknown'].cost === 0) {
       delete dataByMonth['Unknown'];
     }
@@ -1791,9 +1883,19 @@ export default function LedgerDashboard() {
             )}
             {screen === 2 && <UploadInvoice setScreen={setScreen} authFetch={authFetch} setExtractedData={setExtractedData} setExtractedImage={setExtractedImage} />}
             {screen === 3 && <ReviewExtraction setScreen={setScreen} extractedData={extractedData} extractedImage={extractedImage} authFetch={authFetch} fetchInvoices={fetchInvoices} fetchPurchases={fetchPurchases} fetchProducts={fetchProducts} />}
-            {screen === 4 && <Analytics products={products} stats={stats} handleExportCSV={handleExportCSV} />}
+            {screen === 4 && <Analytics products={products} invoices={invoices} purchases={purchases} handleExportCSV={handleExportCSV} />}
             {screen === 5 && <SettingsScreen user={user} setUser={setUser} authFetch={authFetch} />}
             {screen === 6 && <ProductsStockManager products={products} authFetch={authFetch} fetchProducts={fetchProducts} handleExportCSV={handleExportCSV} />}
+            {screen === 7 && (
+              <GstFilingAssistant 
+                invoices={invoices} 
+                purchases={purchases} 
+                authFetch={authFetch} 
+                user={user} 
+                fetchPurchases={fetchPurchases} 
+                fetchInvoices={fetchInvoices} 
+              />
+            )}
           </div>
         </main>
         
@@ -1806,6 +1908,7 @@ export default function LedgerDashboard() {
             user={user} 
             authFetch={authFetch} 
             refreshInvoices={fetchInvoices} 
+            refreshPurchases={fetchPurchases}
             invoices={invoices}
           />
         )}
@@ -1814,7 +1917,7 @@ export default function LedgerDashboard() {
   );
 }
 
-function DocumentDetailModal({ onClose, doc, user, authFetch, refreshInvoices, invoices }) {
+function DocumentDetailModal({ onClose, doc, user, authFetch, refreshInvoices, refreshPurchases, invoices }) {
   const isQuoteOrProforma = ['quotation', 'proforma'].includes(doc.type);
   const isSaleInvoice = doc.sysType === 'sale' && !isQuoteOrProforma;
 
@@ -1836,6 +1939,8 @@ function DocumentDetailModal({ onClose, doc, user, authFetch, refreshInvoices, i
   const [clientMobile, setClientMobile] = useState(doc.clientMobile || '');
   const [sendingQuote, setSendingQuote] = useState(false);
   const [convertingQuote, setConvertingQuote] = useState(false);
+  const [itcEligibilityVal, setItcEligibilityVal] = useState(doc.itcEligibility || 'inputs');
+  const [updatingItc, setUpdatingItc] = useState(false);
 
   useEffect(() => {
     if (isSaleInvoice) {
@@ -1872,6 +1977,7 @@ function DocumentDetailModal({ onClose, doc, user, authFetch, refreshInvoices, i
     setQuoteStatus(doc.status || 'draft');
     setClientEmail(doc.clientEmail || '');
     setClientMobile(doc.clientMobile || '');
+    setItcEligibilityVal(doc.itcEligibility || 'inputs');
   }, [doc, isSaleInvoice, authFetch]);
 
   // Handle due date update
@@ -1989,6 +2095,30 @@ function DocumentDetailModal({ onClose, doc, user, authFetch, refreshInvoices, i
     }
   };
 
+  // Save purchase ITC eligibility
+  const saveItcEligibility = async () => {
+    setUpdatingItc(true);
+    try {
+      const res = await authFetch(`/api/purchases/${doc.id}/itc`, {
+        method: 'PATCH',
+        body: JSON.stringify({ itcEligibility: itcEligibilityVal })
+      });
+      if (res.ok) {
+        alert('ITC eligibility updated successfully!');
+        if (typeof refreshPurchases === 'function') refreshPurchases();
+        doc.itcEligibility = itcEligibilityVal;
+      } else {
+        const data = await res.json();
+        alert('Failed to update ITC: ' + data.error);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error updating ITC eligibility');
+    } finally {
+      setUpdatingItc(false);
+    }
+  };
+
   // Render scheduled reminders timeline
   const renderFutureReminders = () => {
     if (!dueDate || !remindDaysStr) return null;
@@ -2045,6 +2175,36 @@ function DocumentDetailModal({ onClose, doc, user, authFetch, refreshInvoices, i
                 <span style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic' }}>PDF not generated</span>
               )}
             </div>
+
+            {/* Purchase ITC eligibility selector */}
+            {doc.sysType === 'purchase' && (
+              <div style={{ marginBottom: 20, padding: 16, background: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', marginBottom: 8 }}>ITC Eligibility</div>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <select 
+                    value={itcEligibilityVal} 
+                    onChange={(e) => setItcEligibilityVal(e.target.value)} 
+                    disabled={updatingItc}
+                    style={{ flex: 1, border: "1px solid #d1d5db", borderRadius: 6, padding: "8px 12px", fontSize: 13, color: "#111827", background: "#fff", outline: 'none' }}
+                  >
+                    <option value="inputs">Inputs (Goods/Stock)</option>
+                    <option value="capital_goods">Capital Goods</option>
+                    <option value="input_services">Input Services</option>
+                    <option value="ineligible">Ineligible (Section 17(5))</option>
+                  </select>
+                  {itcEligibilityVal !== (doc.itcEligibility || 'inputs') && (
+                    <button 
+                      onClick={saveItcEligibility} 
+                      disabled={updatingItc}
+                      className="btn btn-primary"
+                      style={{ fontSize: 12, padding: '8px 12px', minWidth: 60, justifyContent: 'center' }}
+                    >
+                      {updatingItc ? '...' : 'Save'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Quotation Convert CTA */}
             {isQuoteOrProforma && quoteStatus.toLowerCase() === 'accepted' && (

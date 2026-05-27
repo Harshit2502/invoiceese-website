@@ -33,7 +33,8 @@ const initializeDatabase = async () => {
       '008_create_documents_table.sql',
       '009_add_hsn_code_to_products.sql',
       '010_create_parties_table.sql',
-      '011_add_payment_status_and_reminders.sql'
+      '011_add_payment_status_and_reminders.sql',
+      '012_create_gstr_filing_status_and_itc.sql'
     ];
     
     for (const migration of migrations) {
@@ -158,14 +159,14 @@ const updateUserPassword = async (userId, newPasswordHash) => {
 
 // DOCUMENT FUNCTIONS
 const createDocument = async (docData) => {
-  const { id, userId, docType, direction, parentDocumentId, docNumber, partyName, partyGst, partyAddress, partyMobile, partyState, partyStateCode, reverseCharge, transportMode, vehicleNumber, dateOfSupply, placeOfSupply, items, subtotal, gstRate, gstAmount, cgst, sgst, igst, gstType, total, serviceDescription, notes, dueDate, docDate, paymentDetails, pdfUrl, status, templateStyle, showWatermark, paymentStatus, paidAmount, validUntil, quoteStatus, convertedInvoiceId } = docData;
+  const { id, userId, docType, direction, parentDocumentId, docNumber, partyName, partyGst, partyAddress, partyMobile, partyState, partyStateCode, reverseCharge, transportMode, vehicleNumber, dateOfSupply, placeOfSupply, items, subtotal, gstRate, gstAmount, cgst, sgst, igst, gstType, total, serviceDescription, notes, dueDate, docDate, paymentDetails, pdfUrl, status, templateStyle, showWatermark, paymentStatus, paidAmount, validUntil, quoteStatus, convertedInvoiceId, itcEligibility } = docData;
   const itemsJson = items ? JSON.stringify(items) : '[]';
   const paymentDetailsJson = paymentDetails ? JSON.stringify(paymentDetails) : null;
   const result = await pool.query(
-    `INSERT INTO documents (id, user_id, doc_type, direction, parent_document_id, doc_number, party_name, party_gst, party_address, party_mobile, party_state, party_state_code, reverse_charge, transport_mode, vehicle_number, date_of_supply, place_of_supply, items, subtotal, gst_rate, gst_amount, cgst, sgst, igst, gst_type, total, service_description, notes, due_date, doc_date, payment_details, pdf_url, status, template_style, show_watermark, payment_status, paid_amount, valid_until, quote_status, converted_invoice_id, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31::jsonb, $32, $33, $34, $35, $36, $37, $38, $39, $40, NOW(), NOW())
+    `INSERT INTO documents (id, user_id, doc_type, direction, parent_document_id, doc_number, party_name, party_gst, party_address, party_mobile, party_state, party_state_code, reverse_charge, transport_mode, vehicle_number, date_of_supply, place_of_supply, items, subtotal, gst_rate, gst_amount, cgst, sgst, igst, gst_type, total, service_description, notes, due_date, doc_date, payment_details, pdf_url, status, template_style, show_watermark, payment_status, paid_amount, valid_until, quote_status, converted_invoice_id, itc_eligibility, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31::jsonb, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, NOW(), NOW())
      RETURNING *`,
-    [id, userId, docType, direction, parentDocumentId || null, docNumber, partyName, partyGst || null, partyAddress || null, partyMobile || null, partyState || null, partyStateCode || null, reverseCharge || false, transportMode || null, vehicleNumber || null, dateOfSupply || null, placeOfSupply || null, itemsJson, subtotal || 0, gstRate || 0, gstAmount || 0, cgst || 0, sgst || 0, igst || 0, gstType || 'intrastate', total, serviceDescription || null, notes || null, dueDate || null, docDate || null, paymentDetailsJson, pdfUrl || null, status || 'draft', templateStyle || 'modern', showWatermark === undefined ? true : showWatermark, paymentStatus || 'unpaid', paidAmount || 0.00, validUntil || null, quoteStatus || null, convertedInvoiceId || null]
+    [id, userId, docType, direction, parentDocumentId || null, docNumber, partyName, partyGst || null, partyAddress || null, partyMobile || null, partyState || null, partyStateCode || null, reverseCharge || false, transportMode || null, vehicleNumber || null, dateOfSupply || null, placeOfSupply || null, itemsJson, subtotal || 0, gstRate || 0, gstAmount || 0, cgst || 0, sgst || 0, igst || 0, gstType || 'intrastate', total, serviceDescription || null, notes || null, dueDate || null, docDate || null, paymentDetailsJson, pdfUrl || null, status || 'draft', templateStyle || 'modern', showWatermark === undefined ? true : showWatermark, paymentStatus || 'unpaid', paidAmount || 0.00, validUntil || null, quoteStatus || null, convertedInvoiceId || null, itcEligibility || 'inputs']
   );
   return result.rows[0];
 };
@@ -286,7 +287,8 @@ const mapDocToInvoice = (doc) => {
     paidAmount: doc.paid_amount ? parseFloat(doc.paid_amount) : 0,
     validUntil: doc.valid_until,
     quoteStatus: doc.quote_status,
-    convertedInvoiceId: doc.converted_invoice_id
+    convertedInvoiceId: doc.converted_invoice_id,
+    itcEligibility: doc.itc_eligibility || 'inputs'
   };
 };
 
@@ -471,7 +473,8 @@ const mapDocToPurchase = (doc) => {
     status: doc.status,
     items: doc.items,
     pdfUrl: doc.pdf_url,
-    createdAt: doc.created_at
+    createdAt: doc.created_at,
+    itcEligibility: doc.itc_eligibility || 'inputs'
   };
 };
 
@@ -490,7 +493,8 @@ const createPurchaseInvoice = async (purchaseData) => {
     gstAmount: purchaseData.gstAmount,
     status: purchaseData.status || 'Verified',
     items: purchaseData.items,
-    pdfUrl: purchaseData.pdfUrl
+    pdfUrl: purchaseData.pdfUrl,
+    itcEligibility: purchaseData.itcEligibility || 'inputs'
   };
   const doc = await createDocument(docData);
   return mapDocToPurchase(doc);
@@ -610,6 +614,45 @@ const getReminderLogs = async (invoiceId) => {
   );
 };
 
+const updatePurchaseItc = async (id, itcEligibility) => {
+  if (!isValidUUID(id)) return null;
+  const result = await pool.query(
+    `UPDATE documents SET itc_eligibility = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+    [itcEligibility, id]
+  );
+  try {
+    await pool.query(
+      `UPDATE invoices SET itc_eligibility = $1, updated_at = NOW() WHERE id = $2`,
+      [itcEligibility, id]
+    );
+  } catch (err) {
+    // Ignore if not present
+  }
+  return mapDocToPurchase(result.rows[0]);
+};
+
+const getGstrFilingStatuses = async (userId) => {
+  if (!isValidUUID(userId)) return [];
+  const rows = await dbQuery(
+    `SELECT id, user_id as "userId", filing_month as "filingMonth", arn, filed_at as "filedAt", status FROM gstr_filing_status WHERE user_id = $1 ORDER BY filing_month DESC`,
+    [userId]
+  );
+  return rows;
+};
+
+const upsertGstrFilingStatus = async (userId, { filingMonth, arn, status }) => {
+  if (!isValidUUID(userId)) return null;
+  const result = await pool.query(
+    `INSERT INTO gstr_filing_status (user_id, filing_month, arn, status, filed_at, updated_at)
+     VALUES ($1, $2, $3, $4, NOW(), NOW())
+     ON CONFLICT (user_id, filing_month)
+     DO UPDATE SET arn = EXCLUDED.arn, status = EXCLUDED.status, updated_at = NOW()
+     RETURNING id, user_id as "userId", filing_month as "filingMonth", arn, filed_at as "filedAt", status`,
+    [userId, filingMonth, arn || null, status || 'filed']
+  );
+  return result.rows[0];
+};
+
 module.exports = {
   pool,
   initializeDatabase,
@@ -657,4 +700,7 @@ module.exports = {
   updatePaymentReminderLastSent,
   logReminder,
   getReminderLogs,
+  updatePurchaseItc,
+  getGstrFilingStatuses,
+  upsertGstrFilingStatus,
 };

@@ -128,7 +128,7 @@ router.post('/extract', async (req, res) => {
 router.post('/', async (req, res) => {
   if (process.env.USE_POSTGRES !== 'true') {
     try {
-      const { docType = 'purchase_invoice', supplier, invoiceNo, date, gst, items, subtotal, gstAmt, total } = req.body;
+      const { docType = 'purchase_invoice', supplier, invoiceNo, date, gst, items, subtotal, gstAmt, total, itcEligibility = 'inputs' } = req.body;
       
       if (!supplier || !total) {
         return res.status(400).json({ error: 'Supplier/Client and total are required' });
@@ -208,6 +208,7 @@ router.post('/', async (req, res) => {
           gstAmount: Number(gstAmt),
           status: 'Verified',
           items: processedItems,
+          itcEligibility: itcEligibility || 'inputs',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
@@ -282,7 +283,7 @@ router.post('/', async (req, res) => {
     }
   }
   try {
-    const { docType = 'purchase_invoice', supplier, invoiceNo, date, gst, items, subtotal, gstAmt, total } = req.body;
+    const { docType = 'purchase_invoice', supplier, invoiceNo, date, gst, items, subtotal, gstAmt, total, itcEligibility = 'inputs' } = req.body;
     
     if (!supplier || !total) {
       return res.status(400).json({ error: 'Supplier/Client and total are required' });
@@ -347,7 +348,8 @@ router.post('/', async (req, res) => {
         subtotal: Number(subtotal),
         gstAmount: Number(gstAmt),
         status: 'Verified',
-        items: processedItems
+        items: processedItems,
+        itcEligibility: itcEligibility || 'inputs'
       });
     } else {
       // Process items (Outbound stock reduction)
@@ -471,6 +473,37 @@ router.delete('/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting purchase:', error);
     res.status(500).json({ error: 'Failed to delete purchase invoice' });
+  }
+});
+
+// PATCH /api/purchases/:id/itc
+router.patch('/:id/itc', async (req, res) => {
+  const { id } = req.params;
+  const { itcEligibility } = req.body;
+  if (!['inputs', 'capital_goods', 'input_services', 'ineligible'].includes(itcEligibility)) {
+    return res.status(400).json({ error: 'Invalid ITC eligibility value' });
+  }
+
+  if (process.env.USE_POSTGRES !== 'true') {
+    if (!db.purchases) db.purchases = [];
+    const purchase = db.purchases.find(p => p.id === id && p.userId === req.userId);
+    if (!purchase) return res.status(404).json({ error: 'Purchase invoice not found' });
+    purchase.itcEligibility = itcEligibility;
+    purchase.updatedAt = new Date().toISOString();
+    return res.json({ purchase, message: 'ITC eligibility updated successfully' });
+  }
+
+  try {
+    const pgFunctions = require('../db-postgres');
+    const purchase = await pgFunctions.getDocumentById(id);
+    if (!purchase || purchase.user_id !== req.userId || purchase.doc_type !== 'purchase_invoice') {
+      return res.status(404).json({ error: 'Purchase invoice not found' });
+    }
+    const updated = await pgFunctions.updatePurchaseItc(id, itcEligibility);
+    res.json({ purchase: updated, message: 'ITC eligibility updated successfully' });
+  } catch (error) {
+    console.error('Error updating purchase ITC:', error);
+    res.status(500).json({ error: 'Failed to update ITC eligibility' });
   }
 });
 

@@ -14,7 +14,9 @@
     "concurrently": "^8.2.0"
   },
   "dependencies": {
+    "@types/node": "^25.9.1",
     "axios": "^1.16.1",
+    "exceljs": "^4.4.0",
     "node-cron": "^4.2.1",
     "pdfkit": "^0.18.0",
     "qrcode": "^1.5.4",

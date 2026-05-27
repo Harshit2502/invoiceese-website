@@ -9,6 +9,7 @@ const db = {
   products: [],
   paymentReminders: [],
   reminderLogs: [],
+  gstrFilingStatus: [],
 };
 
 // Seed a demo user
