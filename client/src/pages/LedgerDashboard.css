@@ -207,7 +207,11 @@
 .product-sub { font-size: 11px; color: var(--ink3); margin-top: 2px; }
 .product-margin { font-size: 13px; font-weight: 600; color: var(--green); }
 .margin-bar-wrap { width: 80px; height: 4px; background: var(--border2); border-radius: 2px; margin-top: 4px; }
-.margin-bar { height: 4px; background: var(--green); border-radius: 2px; }
+.doc-table-wrapper, .inv-table-wrapper {
+  overflow-x: auto;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
 
 /* ── RECENT DOCS ── */
 .doc-table { width: 100%; border-collapse: collapse; }
@@ -327,16 +331,51 @@
 @media (max-width: 768px) {
   .layout {
     position: relative;
+    padding-bottom: 60px; /* Space for bottom nav */
   }
   .sidebar {
-    display: none !important;
+    position: fixed;
+    top: 0;
+    left: -228px; /* off-screen var(--sidebar-w) */
+    height: 100vh;
+    z-index: 200;
+    transition: left 0.3s ease;
+    display: flex !important;
+  }
+  .sidebar.open {
+    left: 0;
   }
   .sidebar-backdrop {
-    display: none !important;
+    display: block !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.5);
+    z-index: 190;
+    animation: fadeIn 0.2s ease;
   }
-  
-  .layout {
-    padding-bottom: 60px; /* Space for bottom nav */
+  .sidebar-close-btn {
+    display: flex !important;
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: transparent;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+  }
+  .hamburger-btn {
+    display: flex !important;
+    background: transparent;
+    border: none;
+    color: var(--ink);
+    cursor: pointer;
+    padding: 8px;
+    margin-right: 8px;
+    align-items: center;
+    justify-content: center;
   }
 
   .bottom-nav {
@@ -427,9 +466,6 @@
     align-items: flex-start;
   }
   
-  .hamburger-btn, .sidebar-close-btn {
-    display: none !important;
-  }
 }
 
 @media (max-width: 480px) {

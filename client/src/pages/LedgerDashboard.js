@@ -55,7 +55,6 @@ const standardizeDateForInput = (dateStr) => {
 function Sidebar({ screen, setScreen, user, logout, isSidebarOpen, setIsSidebarOpen }) {
   const nav = [
     { icon: LayoutDashboard, label: "Dashboard", s: 0 },
-    { icon: BarChart2, label: "Analytics", s: 4 },
     { type: 'divider', label: 'Documents' },
     { icon: FileText, label: "All Documents", s: 1 },
     { icon: Upload, label: "Upload Invoice", s: 2 },
@@ -92,7 +91,12 @@ function Sidebar({ screen, setScreen, user, logout, isSidebarOpen, setIsSidebarO
           return (
             <button 
               key={item.label} 
-              onClick={() => item.s !== null && setScreen(item.s)}
+              onClick={() => {
+                if (item.s !== null) {
+                  setScreen(item.s);
+                  if (setIsSidebarOpen) setIsSidebarOpen(false);
+                }
+              }}
               className={`nav-item ${isActive ? 'active' : ''}`}
               style={{ opacity: item.s === null ? 0.5 : 1, cursor: item.s === null ? 'not-allowed' : 'pointer' }}
             >
@@ -126,7 +130,6 @@ function BottomNav({ screen, setScreen, setShowCreate }) {
     { icon: LayoutDashboard, label: "Home", s: 0 },
     { icon: FileText, label: "Docs", s: 1 },
     { icon: Upload, label: "Upload", s: 2 },
-    { icon: BarChart2, label: "Stats", s: 4 },
     { icon: Package, label: "Stocks", s: 6 },
   ];
 
@@ -150,7 +153,103 @@ function BottomNav({ screen, setScreen, setShowCreate }) {
   );
 }
 
-function Dashboard({ setScreen, user, stats, monthData, recentInvoices, invoices, handleSendBulkReminders, sendingBulk }) {
+function Dashboard({ setScreen, user, products = [], invoices = [], purchases = [], handleSendBulkReminders, sendingBulk, handleExportCSV }) {
+  const [timeRange, setTimeRange] = useState('YTD'); // 'YTD', '3_months', '1_month'
+
+  // Filter invoices & purchases by selected time range
+  const filteredData = useMemo(() => {
+    const now = new Date();
+    let cutoff = null;
+    if (timeRange === '3_months') {
+      cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 90);
+    } else if (timeRange === '1_month') {
+      cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 30);
+    } else {
+      // YTD: From Jan 1st of current year (2026)
+      cutoff = new Date(now.getFullYear(), 0, 1);
+    }
+
+    const filteredInvs = invoices.filter(inv => {
+      const dateVal = inv.date || inv.createdAt;
+      if (!dateVal) return false;
+      const d = new Date(dateVal);
+      return !isNaN(d.getTime()) && d >= cutoff;
+    });
+
+    const filteredPurchases = purchases.filter(p => {
+      const dateVal = p.invoiceDate || p.createdAt;
+      if (!dateVal) return false;
+      const d = new Date(dateVal);
+      return !isNaN(d.getTime()) && d >= cutoff;
+    });
+
+    const revenue = filteredInvs
+      .filter(inv => inv.docType === 'sales_invoice')
+      .reduce((sum, inv) => sum + Number(inv.totalAmount || inv.amount || 0), 0);
+
+    const cost = filteredPurchases.reduce((sum, p) => sum + Number(p.total || 0), 0);
+    const grossProfit = revenue - cost;
+
+    return { revenue, purchases: cost, grossProfit, filteredInvs, filteredPurchases };
+  }, [invoices, purchases, timeRange]);
+
+  // Unfiltered stock metrics
+  const stockValue = useMemo(() => {
+    return products.reduce((sum, p) => sum + (Number(p.stockQty || 0) * Number(p.avgCost || 0)), 0);
+  }, [products]);
+
+  // Product-wise Performance table data
+  const inventoryData = useMemo(() => {
+    return products.map(p => {
+      const margin = p.sellingPrice > 0 ? Math.round(((p.sellingPrice - p.avgCost) / p.sellingPrice) * 100) : 0;
+      return { 
+        name: p.name, 
+        remaining: p.stockQty, 
+        margin, 
+        bought: p.stockQty, 
+        sold: 0, 
+        pl: (p.sellingPrice - p.avgCost) * p.stockQty 
+      };
+    });
+  }, [products]);
+
+  // Recent documents list
+  const recentDocuments = useMemo(() => {
+    const all = [
+      ...invoices.map(i => ({ type: 'SALE', party: i.clientName, amount: i.totalAmount || i.amount, date: i.date || i.createdAt, status: i.status === 'paid' ? 'Paid' : 'Pending', ts: safeGetTime(i.createdAt || i.date) })),
+      ...purchases.map(p => ({ type: 'BUY', party: p.supplierName, amount: p.total, date: p.invoiceDate || p.createdAt, status: p.status, ts: safeGetTime(p.createdAt || p.invoiceDate) }))
+    ];
+    return all.sort((a, b) => b.ts - a.ts).slice(0, 5).map(x => ({
+      ...x,
+      date: safeFormatDate(x.date)
+    }));
+  }, [invoices, purchases]);
+
+  // Revenue vs Purchases chart data (filtered dynamically!)
+  const monthData = useMemo(() => {
+    const dataByMonth = {};
+    const process = (arr, key, isSales) => {
+      arr.forEach(item => {
+        if (isSales && item.docType !== 'sales_invoice') return;
+        const d = new Date(item.date || item.invoiceDate || item.createdAt);
+        let m = 'Unknown';
+        if (!isNaN(d.getTime())) {
+          m = d.toLocaleString('en-IN', { month: 'short' });
+        }
+        if (!dataByMonth[m]) dataByMonth[m] = { m, rev: 0, cost: 0 };
+        dataByMonth[m][key] += Number(item.totalAmount || item.amount || item.total || 0);
+      });
+    };
+    process(filteredData.filteredInvs, 'rev', true);
+    process(filteredData.filteredPurchases, 'cost', false);
+    if (dataByMonth['Unknown'] && dataByMonth['Unknown'].rev === 0 && dataByMonth['Unknown'].cost === 0) {
+      delete dataByMonth['Unknown'];
+    }
+    return Object.values(dataByMonth);
+  }, [filteredData.filteredInvs, filteredData.filteredPurchases]);
+
   const sortedMonthData = useMemo(() => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return [...monthData].sort((a, b) => {
@@ -164,15 +263,33 @@ function Dashboard({ setScreen, user, stats, monthData, recentInvoices, invoices
 
   return (
     <div className="screen active" id="screen-dashboard">
-      <div className="section-header">
+      <div className="section-header" style={{ marginBottom: 18 }}>
         <div>
           <div className="section-title">Good morning, {user?.email?.split('@')[0] || 'User'}</div>
-          <div className="section-sub">Business overview and recent activity</div>
+          <div className="section-sub">Business metrics, dynamic analytics & recent activity</div>
         </div>
-        <button className="btn btn-ghost" style={{ fontSize: 12 }}>
-          <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
-        </button>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div className="pill-tabs" style={{ marginBottom: 0 }}>
+            <button 
+              className={`pill-tab ${timeRange === 'YTD' ? 'active' : ''}`}
+              onClick={() => setTimeRange('YTD')}
+            >
+              YTD
+            </button>
+            <button 
+              className={`pill-tab ${timeRange === '3_months' ? 'active' : ''}`}
+              onClick={() => setTimeRange('3_months')}
+            >
+              Last 3 months
+            </button>
+            <button 
+              className={`pill-tab ${timeRange === '1_month' ? 'active' : ''}`}
+              onClick={() => setTimeRange('1_month')}
+            >
+              1 month
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Outstanding Summary Widget */}
@@ -235,91 +352,182 @@ function Dashboard({ setScreen, user, stats, monthData, recentInvoices, invoices
         );
       })()}
 
-      <div className="stats-grid">
+      <div className="stats-grid" style={{ marginBottom: 24 }}>
         <div className="stat-card accent">
           <div className="stat-label">Net Profit</div>
-          <div className="stat-value">₹{(stats.revenue - stats.purchases).toLocaleString()}</div>
+          <div className="stat-value">₹{filteredData.grossProfit.toLocaleString()}</div>
           <div className="stat-delta">
-            <span className="delta-tag" style={{ background: 'rgba(255,255,255,.2)', color: '#fff' }}>YTD</span>
+            <span className="delta-tag" style={{ background: 'rgba(255,255,255,.2)', color: '#fff' }}>
+              {timeRange === 'YTD' ? 'YTD Derived' : timeRange === '3_months' ? '90 Days Derived' : '30 Days Derived'}
+            </span>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Revenue</div>
-          <div className="stat-value">₹{stats.revenue.toLocaleString()}</div>
-          <div className="stat-delta"><span className="delta-tag up">YTD</span></div>
+          <div className="stat-value">₹{filteredData.revenue.toLocaleString()}</div>
+          <div className="stat-delta">
+            <span className="delta-tag up">
+              {timeRange === 'YTD' ? 'YTD' : timeRange === '3_months' ? '90d' : '30d'}
+            </span>
+          </div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Purchases</div>
-          <div className="stat-value">₹{stats.purchases.toLocaleString()}</div>
-          <div className="stat-delta"><span className="delta-tag dn">YTD</span></div>
+          <div className="stat-value">₹{filteredData.purchases.toLocaleString()}</div>
+          <div className="stat-delta">
+            <span className="delta-tag dn">
+              {timeRange === 'YTD' ? 'YTD' : timeRange === '3_months' ? '90d' : '30d'}
+            </span>
+          </div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Stock Value</div>
-          <div className="stat-value">₹{stats.stockValue.toLocaleString()}</div>
+          <div className="stat-label">Stock Valuation</div>
+          <div className="stat-value">₹{stockValue.toLocaleString()}</div>
           <div className="stat-delta"><span className="delta-tag" style={{ background: 'var(--border2)' }}>Current</span></div>
         </div>
       </div>
 
-      <div className="two-col" style={{ gridTemplateColumns: "1fr" }}>
-        <div className="card">
-          <div className="card-title">Revenue vs Purchases</div>
-          <div className="bar-chart">
-            {sortedMonthData.map((d, i) => (
-              <div className="bar-group" key={i}>
-                <div className="bar bar-rev" style={{ height: `${(d.rev/maxChartVal)*110}px` }} title={`Revenue ₹${d.rev.toLocaleString()}`}></div>
-                <div className="bar bar-cost" style={{ height: `${(d.cost/maxChartVal)*110}px` }} title={`Purchases ₹${d.cost.toLocaleString()}`}></div>
-                <div className="bar-label">{d.m}</div>
-              </div>
-            ))}
-            {sortedMonthData.length === 0 && (
-              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: 'var(--ink3)', fontSize: 13 }}>No data yet</div>
-            )}
+      <div className="two-col" style={{ alignItems: 'start', gap: 20 }}>
+        
+        {/* Left Column: Bar Chart & Recent Documents */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div className="card">
+            <div className="card-title">Revenue vs Purchases</div>
+            <div className="bar-chart" style={{ height: 140 }}>
+              {sortedMonthData.map((d, i) => (
+                <div className="bar-group" key={i}>
+                  <div className="bar bar-rev" style={{ height: `${(d.rev/maxChartVal)*110}px` }} title={`Revenue ₹${d.rev.toLocaleString()}`}></div>
+                  <div className="bar bar-cost" style={{ height: `${(d.cost/maxChartVal)*110}px` }} title={`Purchases ₹${d.cost.toLocaleString()}`}></div>
+                  <div className="bar-label">{d.m}</div>
+                </div>
+              ))}
+              {sortedMonthData.length === 0 && (
+                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: 'var(--ink3)', fontSize: 13 }}>No data in this period</div>
+              )}
+            </div>
+            <div className="chart-legend">
+              <div className="legend-label"><div className="legend-dot" style={{ background: 'var(--green)' }}></div>Revenue</div>
+              <div className="legend-label"><div className="legend-dot" style={{ background: 'var(--green-l)', border: '1px solid #9FE1CB' }}></div>Purchases</div>
+            </div>
           </div>
-          <div className="chart-legend">
-            <div className="legend-label"><div className="legend-dot" style={{ background: 'var(--green)' }}></div>Revenue</div>
-            <div className="legend-label"><div className="legend-dot" style={{ background: 'var(--green-l)', border: '1px solid #9FE1CB' }}></div>Purchases</div>
+
+          <div className="card">
+            <div className="card-title">Recent documents</div>
+            <div className="doc-table-wrapper">
+              <table className="doc-table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Party</th>
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentDocuments.map((r, i) => (
+                  <tr key={i}>
+                    <td>
+                      <span className={`doc-type-badge ${r.type === 'SALE' ? 'badge-sale' : 'badge-buy'}`}>
+                        {r.type === 'SALE' ? 'Sales Invoice' : 'Purchase'}
+                      </span>
+                    </td>
+                    <td style={{ fontWeight: 500 }}>{r.party}</td>
+                    <td style={{ color: 'var(--ink3)' }}>{r.date}</td>
+                    <td style={{ fontWeight: 600 }}>₹{Number(r.amount).toLocaleString()}</td>
+                    <td>
+                      <span className={`status-dot ${r.status === 'Paid' || r.status === 'Verified' ? 'status-paid' : r.status === 'Reviewing' ? 'status-review' : 'status-pending'}`}></span>
+                      {r.status}
+                    </td>
+                  </tr>
+                ))}
+                {recentDocuments.length === 0 && (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: "center", padding: 40, color: "var(--ink3)" }}>
+                      No transactions found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="card">
-        <div className="card-title">Recent documents</div>
-        <table className="doc-table">
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Party</th>
-              <th>Date</th>
-              <th>Amount</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {recentInvoices.map((r, i) => (
-              <tr key={i}>
-                <td>
-                  <span className={`doc-type-badge ${r.type === 'SALE' ? 'badge-sale' : 'badge-buy'}`}>
-                    {r.type === 'SALE' ? 'Sales Invoice' : 'Purchase'}
-                  </span>
-                </td>
-                <td style={{ fontWeight: 500 }}>{r.party}</td>
-                <td style={{ color: 'var(--ink3)' }}>{r.date}</td>
-                <td style={{ fontWeight: 600 }}>₹{Number(r.amount).toLocaleString()}</td>
-                <td>
-                  <span className={`status-dot ${r.status === 'Paid' || r.status === 'Verified' ? 'status-paid' : r.status === 'Reviewing' ? 'status-review' : 'status-pending'}`}></span>
-                  {r.status}
-                </td>
-              </tr>
-            ))}
-            {recentInvoices.length === 0 && (
-              <tr>
-                <td colSpan="5" style={{ textAlign: "center", padding: 40, color: "var(--ink3)" }}>
-                  No transactions yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        {/* Right Column: Inventory Performance, GST Summary & Stock Alerts */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div className="card-title" style={{ margin: 0 }}>Product Margins & Stock</div>
+              {handleExportCSV && (
+                <button className="btn btn-ghost" onClick={() => handleExportCSV('stocks')} style={{ gap: 4, display: 'flex', alignItems: 'center', padding: '4px 8px', fontSize: 11, background: 'var(--border2)', color: 'var(--ink2)', border: 'none', borderRadius: 6, fontWeight: 600 }}>
+                  <Download size={11} /> Excel
+                </button>
+              )}
+            </div>
+            <div className="inv-table-wrapper">
+              <table className="inv-table" style={{ width: '100%' }}>
+              <thead>
+                <tr><th>Product</th><th>Stock</th><th>Margin</th><th>Est P&L</th></tr>
+              </thead>
+              <tbody>
+                {inventoryData.slice(0, 5).map((p, i) => (
+                  <tr key={i}>
+                    <td style={{ fontWeight: 500, fontSize: 12.5 }}>{p.name}</td>
+                    <td>
+                      <span style={{ fontSize: 10.5, padding: '1px 6px', borderRadius: 4, fontWeight: 600, background: p.remaining <= 6 ? '#fee2e2' : 'var(--border2)', color: p.remaining <= 6 ? '#991b1b' : 'var(--ink2)' }}>
+                        {p.remaining}
+                      </span>
+                    </td>
+                    <td>
+                      <span style={{ fontWeight: 600, color: 'var(--green)', fontSize: 12 }}>{p.margin}%</span>
+                    </td>
+                    <td style={{ fontWeight: 600, color: 'var(--ink)', fontSize: 12 }}>₹{Math.round(p.pl).toLocaleString()}</td>
+                  </tr>
+                ))}
+                {inventoryData.length === 0 && (
+                  <tr><td colSpan="4" style={{ textAlign: 'center', color: 'var(--ink3)', padding: 20 }}>No products found</td></tr>
+                )}
+              </tbody>
+            </table>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-title">GST Portal Estimations <span>{timeRange === 'YTD' ? 'YTD' : timeRange === '3_months' ? 'Last 3 Months' : 'Last 1 Month'}</span></div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border2)' }}>
+                <span style={{ fontSize: 12.5, color: 'var(--ink2)' }}>Estimated Revenue</span>
+                <span style={{ fontSize: 12.5, fontWeight: 600 }}>₹{filteredData.revenue.toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border2)' }}>
+                <span style={{ fontSize: 12.5, color: 'var(--ink2)' }}>Estimated Purchases</span>
+                <span style={{ fontSize: 12.5, fontWeight: 600 }}>₹{filteredData.purchases.toLocaleString()}</span>
+              </div>
+              <div style={{ marginTop: 6, padding: '10px 12px', background: 'var(--terra-l)', borderRadius: 8, fontSize: 11.5, color: '#7C3A1A' }}>
+                📅 Next GST filing due: <strong>20 Next Month</strong>
+              </div>
+            </div>
+          </div>
+
+          {inventoryData.some(p => p.remaining <= 6) && (
+            <div className="card" style={{ borderColor: '#fee2e2', background: '#fff' }}>
+              <div className="card-title" style={{ color: '#991B1B' }}>⚠️ Low Stock Alerts</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+                {inventoryData.filter(p => p.remaining <= 6).slice(0, 3).map((p, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, fontSize: 12, alignItems: 'center' }}>
+                    <div style={{ width: 6, height: 6, background: '#EF4444', borderRadius: '50%' }}></div>
+                    <div style={{ flex: 1, fontWeight: 600, color: 'var(--ink)' }}>{p.name}</div>
+                    <div style={{ color: '#B91C1C', fontWeight: 600 }}>Only {p.remaining} left</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+        </div>
+
       </div>
     </div>
   );
@@ -482,7 +690,8 @@ function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoi
 
       <div className="card">
         <div className="card-title">{filter === 'all' ? 'All Documents' : getDocBadge(filter).label}</div>
-        <table className="doc-table">
+        <div className="doc-table-wrapper">
+          <table className="doc-table">
           <thead>
             <tr>
               <th>Type</th>
@@ -590,6 +799,7 @@ function InvoiceHub({ setScreen, invoices, purchases, setShowCreate, updateInvoi
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       <div className="alert alert-info">
@@ -1027,181 +1237,7 @@ function ReviewExtraction({ setScreen, extractedData, extractedImage, authFetch,
   );
 }
 
-function Analytics({ products, invoices, purchases, handleExportCSV }) {
-  const [timeRange, setTimeRange] = useState('YTD'); // 'YTD', '3_months', '1_month'
 
-  const filteredData = useMemo(() => {
-    const now = new Date();
-    let cutoff = null;
-    if (timeRange === '3_months') {
-      cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 90);
-    } else if (timeRange === '1_month') {
-      cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 30);
-    } else {
-      // YTD: From January 1st of current year (2026)
-      cutoff = new Date(now.getFullYear(), 0, 1);
-    }
-
-    const filteredInvs = invoices.filter(inv => {
-      const dateVal = inv.date || inv.createdAt;
-      if (!dateVal) return false;
-      const d = new Date(dateVal);
-      return !isNaN(d.getTime()) && d >= cutoff;
-    });
-
-    const filteredPurchases = purchases.filter(p => {
-      const dateVal = p.invoiceDate || p.createdAt;
-      if (!dateVal) return false;
-      const d = new Date(dateVal);
-      return !isNaN(d.getTime()) && d >= cutoff;
-    });
-
-    const revenue = filteredInvs.reduce((sum, inv) => sum + Number(inv.totalAmount || inv.amount || 0), 0);
-    const cost = filteredPurchases.reduce((sum, p) => sum + Number(p.total || 0), 0);
-    const grossProfit = revenue - cost;
-
-    return { revenue, purchases: cost, grossProfit };
-  }, [invoices, purchases, timeRange]);
-
-  const inventoryData = products.map(p => {
-    const margin = p.sellingPrice > 0 ? Math.round(((p.sellingPrice - p.avgCost) / p.sellingPrice) * 100) : 0;
-    return { name: p.name, remaining: p.stockQty, margin, bought: p.stockQty, sold: 0, pl: (p.sellingPrice - p.avgCost) * p.stockQty };
-  });
-
-  return (
-    <div className="screen active" id="screen-analytics">
-      <div className="section-header">
-        <div>
-          <div className="section-title">Analytics</div>
-          <div className="section-sub">Auto-generated from your sales & purchase invoices</div>
-        </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button className="btn btn-ghost" onClick={() => handleExportCSV('stocks')} style={{ gap: 6, display: 'flex', alignItems: 'center', background: 'var(--border2)', color: 'var(--ink2)', border: '1px solid var(--border)', padding: '8px 12px', fontSize: 13, borderRadius: 8, fontWeight: 600 }}>
-            <Download size={14} /> Export Stocks (Excel)
-          </button>
-          <div className="pill-tabs">
-            <button 
-              className={`pill-tab ${timeRange === 'YTD' ? 'active' : ''}`}
-              onClick={() => setTimeRange('YTD')}
-            >
-              YTD
-            </button>
-            <button 
-              className={`pill-tab ${timeRange === '3_months' ? 'active' : ''}`}
-              onClick={() => setTimeRange('3_months')}
-            >
-              Last 3 months
-            </button>
-            <button 
-              className={`pill-tab ${timeRange === '1_month' ? 'active' : ''}`}
-              onClick={() => setTimeRange('1_month')}
-            >
-              1 month
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="stats-grid" style={{ marginBottom: 20 }}>
-        <div className="stat-card accent">
-          <div className="stat-label">Gross Profit</div>
-          <div className="stat-value">₹{filteredData.grossProfit.toLocaleString()}</div>
-          <div className="stat-delta">
-            <span style={{ background: 'rgba(255,255,255,.2)', color: '#fff', padding: '2px 7px', borderRadius: 4, fontSize: 11, fontWeight: 600 }}>
-              {timeRange === 'YTD' ? 'YTD Derived' : timeRange === '3_months' ? '90 Days Derived' : '30 Days Derived'}
-            </span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Units Sold</div>
-          <div className="stat-value">--</div>
-          <div className="stat-delta"><span className="delta-tag up">Needs SKU tracking</span></div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Avg Margin</div>
-          <div className="stat-value">
-            {inventoryData.length > 0 ? `${Math.round(inventoryData.reduce((acc, p) => acc + p.margin, 0) / inventoryData.length)}%` : '0%'}
-          </div>
-          <div className="stat-delta" style={{ color: 'var(--ink3)' }}>across all products</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Stock SKUs</div>
-          <div className="stat-value">{products.length}</div>
-          <div className="stat-delta"><span className="delta-tag up">Active</span></div>
-        </div>
-      </div>
-
-      <div className="analytics-grid">
-        <div className="card analytics-big">
-          <div className="card-title">Product-wise performance <span>margin · stock remaining</span></div>
-          <table className="inv-table">
-            <thead>
-              <tr><th>Product</th><th>Stock</th><th>Margin %</th><th>Est P&L</th></tr>
-            </thead>
-            <tbody>
-              {inventoryData.slice(0, 5).map((p, i) => (
-                <tr key={i}>
-                  <td style={{ fontWeight: 500 }}>{p.name}</td>
-                  <td>
-                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 600, background: p.remaining <= 6 ? '#fee2e2' : 'var(--border2)', color: p.remaining <= 6 ? '#991b1b' : 'var(--ink2)' }}>
-                      {p.remaining}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 60, height: 4, background: 'var(--border2)', borderRadius: 2 }}>
-                        <div style={{ width: `${Math.min(p.margin, 100)}%`, height: 4, background: 'var(--green)', borderRadius: 2 }}></div>
-                      </div>
-                      <span style={{ fontWeight: 600, color: 'var(--green)' }}>{p.margin}%</span>
-                    </div>
-                  </td>
-                  <td style={{ fontWeight: 600, color: 'var(--ink)' }}>₹{p.pl.toLocaleString()}</td>
-                </tr>
-              ))}
-              {inventoryData.length === 0 && (
-                <tr><td colSpan="4" style={{ textAlign: 'center', color: 'var(--ink3)', padding: 20 }}>No products found</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="card">
-          <div className="card-title">GST summary <span>{timeRange === 'YTD' ? 'YTD' : timeRange === '3_months' ? 'Last 3 Months' : 'Last 1 Month'}</span></div>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border2)' }}>
-              <span style={{ fontSize: 13, color: 'var(--ink2)' }}>Estimated Revenue</span>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>₹{filteredData.revenue.toLocaleString()}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border2)' }}>
-              <span style={{ fontSize: 13, color: 'var(--ink2)' }}>Estimated Purchases</span>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>₹{filteredData.purchases.toLocaleString()}</span>
-            </div>
-            <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--terra-l)', borderRadius: 8, fontSize: 12, color: '#7C3A1A' }}>
-              📅 Next GST filing due: <strong>20 Next Month</strong>
-            </div>
-          </div>
-        </div>
-
-        {inventoryData.some(p => p.remaining <= 6) && (
-          <div className="card">
-            <div className="card-title">Low Stock Alerts</div>
-            {inventoryData.filter(p => p.remaining <= 6).map((p, i) => (
-              <div key={i} className="low-stock">
-                <div className="low-stock-icon">⚠️</div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#991B1B' }}>{p.name}</div>
-                  <div style={{ fontSize: 12, color: '#B91C1C', marginTop: 2 }}>Only {p.remaining} left in stock.</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function ProductsStockManager({ products, authFetch, fetchProducts, handleExportCSV }) {
   const [search, setSearch] = useState('');
@@ -1408,7 +1444,8 @@ function ProductsStockManager({ products, authFetch, fetchProducts, handleExport
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <table className="inv-table">
+        <div className="inv-table-wrapper">
+          <table className="inv-table">
           <thead>
             <tr>
               <th>Product Name</th>
@@ -1484,6 +1521,7 @@ function ProductsStockManager({ products, authFetch, fetchProducts, handleExport
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {isModalOpen && (
@@ -1777,47 +1815,7 @@ export default function LedgerDashboard() {
     document.body.removeChild(link);
   };
 
-  const stats = useMemo(() => {
-    const revenue = invoices
-      .filter(inv => inv.docType === 'sales_invoice')
-      .reduce((sum, inv) => sum + Number(inv.totalAmount || inv.amount || 0), 0);
-    const cost = purchases.reduce((sum, p) => sum + Number(p.total || 0), 0);
-    const stockValue = products.reduce((sum, p) => sum + (Number(p.stockQty || 0) * Number(p.avgCost || 0)), 0);
-    return { revenue, purchases: cost, stockValue };
-  }, [invoices, purchases, products]);
 
-  const recentInvoices = useMemo(() => {
-    const all = [
-      ...invoices.map(i => ({ type: 'SALE', party: i.clientName, amount: i.totalAmount || i.amount, date: i.date || i.createdAt, status: i.status === 'paid' ? 'Paid' : 'Pending', ts: safeGetTime(i.createdAt || i.date) })),
-      ...purchases.map(p => ({ type: 'BUY', party: p.supplierName, amount: p.total, date: p.invoiceDate || p.createdAt, status: p.status, ts: safeGetTime(p.createdAt || p.invoiceDate) }))
-    ];
-    return all.sort((a, b) => b.ts - a.ts).slice(0, 5).map(x => ({
-      ...x,
-      date: safeFormatDate(x.date)
-    }));
-  }, [invoices, purchases]);
-
-  const monthData = useMemo(() => {
-    const dataByMonth = {};
-    const process = (arr, key, isSales) => {
-      arr.forEach(item => {
-        if (isSales && item.docType !== 'sales_invoice') return;
-        const d = new Date(item.date || item.invoiceDate || item.createdAt);
-        let m = 'Unknown';
-        if (!isNaN(d.getTime())) {
-          m = d.toLocaleString('en-IN', { month: 'short' });
-        }
-        if (!dataByMonth[m]) dataByMonth[m] = { m, rev: 0, cost: 0 };
-        dataByMonth[m][key] += Number(item.totalAmount || item.amount || item.total || 0);
-      });
-    };
-    process(invoices, 'rev', true);
-    process(purchases, 'cost', false);
-    if (dataByMonth['Unknown'] && dataByMonth['Unknown'].rev === 0 && dataByMonth['Unknown'].cost === 0) {
-      delete dataByMonth['Unknown'];
-    }
-    return Object.values(dataByMonth);
-  }, [invoices, purchases]);
 
   if (loading) {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f8f5ee' }}>Loading...</div>;
@@ -1828,18 +1826,29 @@ export default function LedgerDashboard() {
     1: "All Documents",
     2: "Upload Invoice",
     3: "Review Invoice",
-    4: "Analytics",
     5: "Settings",
-    6: "Products & Stock"
+    6: "Products & Stock",
+    7: "GST Filing Assistant"
   };
 
   return (
     <div className="ledger-dashboard-wrapper">
+      {isSidebarOpen && <div className="sidebar-backdrop" onClick={() => setIsSidebarOpen(false)}></div>}
       <div className="layout">
-        <Sidebar screen={screen} setScreen={setScreen} user={user} logout={logout} />
+        <Sidebar 
+          screen={screen} 
+          setScreen={setScreen} 
+          user={user} 
+          logout={logout} 
+          isSidebarOpen={isSidebarOpen}
+          setIsSidebarOpen={setIsSidebarOpen}
+        />
         
         <main className="main">
           <div className="topbar">
+            <button className="hamburger-btn" onClick={() => setIsSidebarOpen(true)}>
+              <Menu size={20} />
+            </button>
             <div className="topbar-title">{screenTitles[screen] || "Dashboard"}</div>
             <div className="topbar-search">
               <Search size={14} color="#9ca3af" />
@@ -1860,12 +1869,12 @@ export default function LedgerDashboard() {
               <Dashboard 
                 setScreen={setScreen} 
                 user={user} 
-                stats={stats} 
-                monthData={monthData} 
-                recentInvoices={recentInvoices} 
+                products={products}
                 invoices={invoices}
+                purchases={purchases}
                 handleSendBulkReminders={handleSendBulkReminders}
                 sendingBulk={sendingBulk}
+                handleExportCSV={handleExportCSV}
               />
             )}
             {screen === 1 && (
@@ -1883,7 +1892,6 @@ export default function LedgerDashboard() {
             )}
             {screen === 2 && <UploadInvoice setScreen={setScreen} authFetch={authFetch} setExtractedData={setExtractedData} setExtractedImage={setExtractedImage} />}
             {screen === 3 && <ReviewExtraction setScreen={setScreen} extractedData={extractedData} extractedImage={extractedImage} authFetch={authFetch} fetchInvoices={fetchInvoices} fetchPurchases={fetchPurchases} fetchProducts={fetchProducts} />}
-            {screen === 4 && <Analytics products={products} invoices={invoices} purchases={purchases} handleExportCSV={handleExportCSV} />}
             {screen === 5 && <SettingsScreen user={user} setUser={setUser} authFetch={authFetch} />}
             {screen === 6 && <ProductsStockManager products={products} authFetch={authFetch} fetchProducts={fetchProducts} handleExportCSV={handleExportCSV} />}
             {screen === 7 && (
