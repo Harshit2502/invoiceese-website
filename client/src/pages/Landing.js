@@ -5,18 +5,18 @@ import Footer from '../components/Footer';
 import './Landing.css';
 
 const features = [
-  { icon: '⚡', title: 'Instant generation', desc: 'No forms to fill. Just send a Telegram message and get your invoice in 30 seconds.' },
+  { icon: '⚡', title: 'Instant generation', desc: 'Create professional, GST-compliant invoices in under 30 seconds directly from your browser.' },
   { icon: '✓', title: 'GST compliant', desc: 'Automatic CGST & SGST calculations. All invoices follow Indian tax regulations perfectly.' },
   { icon: '💼', title: 'Professional look', desc: 'Beautiful templates with your logo and branding. Make a great impression on every client.' },
-  { icon: '📱', title: 'No app needed', desc: 'Works entirely on Telegram. Your clients can access invoices instantly on any device.' },
+  { icon: '📱', title: 'No app needed', desc: 'Fully responsive web application. Generate and manage invoices from any mobile or desktop browser.' },
   { icon: '🔒', title: 'Secure storage', desc: 'All invoices saved securely in the cloud. Access them anytime, from anywhere.' },
   { icon: '📊', title: 'Track payments', desc: 'See which invoices are paid and pending. Keep your finances organised effortlessly.' },
 ];
 
 const steps = [
   { n: '1', title: 'Sign up and set up', desc: 'Create your account in 2 minutes. Add your business name, GST number, and bank details once.' },
-  { n: '2', title: 'Message our Telegram bot', desc: 'Send a message like "Invoice for Acme Corp, ₹50,000, Website Design" to our bot.' },
-  { n: '3', title: 'Get your PDF instantly', desc: 'Within 30 seconds, receive a professional GST-compliant invoice as a PDF. Download and share!' },
+  { n: '2', title: 'Enter invoice details', desc: 'Input your client name, amount, and item details manually, or upload a receipt to parse details.' },
+  { n: '3', title: 'Download your PDF instantly', desc: 'Get a clean, professional, GST-compliant PDF invoice generated instantly. Ready to share with your clients!' },
 ];
 
 export default function Landing() {
@@ -30,7 +30,7 @@ export default function Landing() {
           <div className="hero-content">
             <div className="hero-badge">🇮🇳 Built for Indian freelancers</div>
             <h1>GST Invoices in<br /><span className="gradient-text">30 Seconds</span></h1>
-            <p>Stop wasting time on invoices. Just message our Telegram bot with your details and get a professional, GST-compliant invoice instantly.</p>
+            <p>Stop wasting time on billing. Generate professional, GST-compliant invoices instantly from your web dashboard on any device.</p>
             <div className="hero-buttons">
               <Link to="/signup" className="btn btn-primary btn-lg">Get Started Free</Link>
               <Link to="#how-it-works" className="btn btn-secondary btn-lg">See How It Works</Link>
@@ -47,18 +47,24 @@ export default function Landing() {
           <div className="hero-demo">
             <div className="demo-header">
               <div className="demo-dot red" /><div className="demo-dot yellow" /><div className="demo-dot green" />
-              <span className="demo-title">Telegram</span>
+              <span className="demo-title">Invoice Generator</span>
             </div>
             <div className="telegram-mockup">
-              <div className="tg-message user">Invoice for Acme Corp, ₹50,000, Website Design</div>
-              <div className="tg-message bot">
-                ✅ <strong>Invoice generated!</strong><br /><br />
-                Invoice #INV-001<br />
-                Client: Acme Corp<br />
-                Amount: ₹50,000<br />
-                GST (18%): ₹9,000<br />
-                <strong>Total: ₹59,000</strong><br /><br />
-                📄 <span className="link-text">Download PDF →</span>
+              <div className="tg-message user" style={{ background: '#f1f5f9', color: '#1e293b', border: '1px solid #cbd5e1', borderRadius: 8, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <strong>📄 Web Invoice Form</strong>
+                <span style={{ fontSize: 11, color: '#0f6e56', fontWeight: 600 }}>Ready</span>
+              </div>
+              <div className="tg-message bot" style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: '16px' }}>
+                <div style={{ borderBottom: '1px solid var(--border2)', paddingBottom: 8, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <strong style={{ color: 'var(--ink)' }}>Invoice #INV-001</strong>
+                  <span style={{ fontSize: 11, color: '#10b981', background: '#d1fae5', padding: '2px 8px', borderRadius: 12, fontWeight: 600 }}>Generated</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--ink3)' }}>Client:</span><strong style={{ color: 'var(--ink)' }}>Acme Corp</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--ink3)' }}>Amount:</span><strong style={{ color: 'var(--ink)' }}>₹50,000.00</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--ink3)' }}>GST (18%):</span><strong style={{ color: 'var(--ink)' }}>₹9,000.00</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border2)', paddingTop: 6, fontWeight: 700, fontSize: 14 }}><span style={{ color: 'var(--ink)' }}>Total:</span><strong style={{ color: 'var(--green)' }}>₹59,000.00</strong></div>
+                </div>
               </div>
             </div>
             <div className="demo-footer">⚡ 30 seconds. That's it.</div>
@@ -103,10 +109,10 @@ export default function Landing() {
           </div>
           <div className="how-visual">
             <div className="how-card">
-              <div className="how-card-icon">💬</div>
-              <div className="how-card-title">Say it in Hindi too!</div>
-              <div className="how-card-example">"Sharma ji ke liye invoice banao, 50 hazaar, website design ke liye"</div>
-              <div className="how-card-sub">Our AI understands Hindi, Marathi &amp; English</div>
+              <div className="how-card-icon">📸</div>
+              <div className="how-card-title">AI Receipt OCR</div>
+              <div className="how-card-example">Upload a photo/PDF of any purchase invoice</div>
+              <div className="how-card-sub">AI reads items, GSTIN, and totals in 5 seconds</div>
             </div>
           </div>
         </div>
@@ -126,7 +132,7 @@ export default function Landing() {
                 <li>✓ 5 invoices per month</li>
                 <li>✓ GST compliant</li>
                 <li>✓ Basic template</li>
-                <li>✓ Telegram support</li>
+                <li>✓ Web dashboard access</li>
               </ul>
               <Link to="/signup" className="btn btn-secondary btn-block" style={{ marginTop: 24 }}>Start Free</Link>
             </div>

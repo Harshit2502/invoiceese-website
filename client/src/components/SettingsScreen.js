@@ -3,7 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { CheckCircle, AlertCircle, Settings as SettingsIcon } from 'lucide-react';
 
-const TELEGRAM_BOT_USERNAME = process.env.REACT_APP_TELEGRAM_BOT || 'InvoiceEaseBot';
 const T = "#0F6E56";
 
 export default function SettingsScreen({ user, setUser, authFetch }) {
@@ -23,33 +22,7 @@ export default function SettingsScreen({ user, setUser, authFetch }) {
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [logoUploadPayload, setLogoUploadPayload] = useState(null);
   
-  const [telegramStatus, setTelegramStatus] = useState(null);
-  const [telegramLoading, setTelegramLoading] = useState(true);
-  const [telegramError, setTelegramError] = useState('');
-  const [telegramTestSending, setTelegramTestSending] = useState(false);
-  const [telegramTestMessage, setTelegramTestMessage] = useState('');
 
-  const isPro = user?.plan === 'pro' || user?.plan === 'business';
-  const isFree = user?.plan === 'free';
-
-  useEffect(() => {
-    const fetchTelegramStatus = async () => {
-      try {
-        const res = await authFetch('/api/telegram/status');
-        if (res.ok) {
-          const data = await res.json();
-          setTelegramStatus(data);
-        } else {
-          setTelegramError('Could not fetch Telegram integration status');
-        }
-      } catch (err) {
-        setTelegramError('Failed to connect to backend for Telegram status');
-      } finally {
-        setTelegramLoading(false);
-      }
-    };
-    fetchTelegramStatus();
-  }, [authFetch]);
 
   const handleLogoUpload = (e) => {
     const file = e.target.files?.[0];
@@ -133,23 +106,8 @@ export default function SettingsScreen({ user, setUser, authFetch }) {
     }
   };
 
-  const handleSendTelegramTest = async () => {
-    setTelegramTestSending(true);
-    setTelegramTestMessage('');
-    try {
-      const response = await authFetch('/api/telegram/test-send', {
-        method: 'POST',
-        body: JSON.stringify({}),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to send test message');
-      setTelegramTestMessage(`Test message sent to chat ${data.chatId}`);
-    } catch (error) {
-      setTelegramTestMessage(error.message);
-    } finally {
-      setTelegramTestSending(false);
-    }
-  };
+  const isPro = user?.plan === 'pro' || user?.plan === 'business';
+  const isFree = user?.plan === 'free';
 
   return (
     <div className="dashboard-main">
@@ -274,50 +232,7 @@ export default function SettingsScreen({ user, setUser, authFetch }) {
           </form>
         </div>
 
-        {/* Telegram Integration Panel */}
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 24 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 600, color: "#0f172a", marginBottom: 8 }}>Telegram Integration</h3>
-            <p style={{ fontSize: 13, color: "#64748b", marginBottom: 20 }}>Connect your Telegram bot to create invoices via chat automatically.</p>
-            
-            <a href={`https://t.me/${TELEGRAM_BOT_USERNAME}?start=${user?.whatsapp ? String(user.whatsapp).replace(/[^0-9]/g, '') : ''}`} target="_blank" rel="noreferrer" style={{ display: "block", textAlign: "center", background: "#0088cc", color: "#fff", padding: "10px", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 600, marginBottom: 20 }}>
-              Open @{TELEGRAM_BOT_USERNAME}
-            </a>
-
-            {telegramLoading ? (
-              <div style={{ fontSize: 13, color: "#64748b", textAlign: "center" }}>Loading status...</div>
-            ) : telegramError ? (
-              <div style={{ padding: 12, background: "#fef2f2", color: "#b91c1c", borderRadius: 8, fontSize: 13 }}>{telegramError}</div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px", background: "#fff", borderRadius: 8, border: "1px solid #e2e8f0" }}>
-                  <span style={{ fontSize: 13, color: "#475569", fontWeight: 500 }}>Bot Status</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, padding: "4px 8px", borderRadius: 12, background: telegramStatus?.configured ? "#dcfce7" : "#fef3c7", color: telegramStatus?.configured ? "#166534" : "#92400e" }}>
-                    {telegramStatus?.configured ? 'Connected' : 'Not configured'}
-                  </span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px", background: "#fff", borderRadius: 8, border: "1px solid #e2e8f0" }}>
-                  <span style={{ fontSize: 13, color: "#475569", fontWeight: 500 }}>Linked Account</span>
-                  <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 500 }}>{user?.telegram_chat_id || 'None'}</span>
-                </div>
-                
-                <button 
-                  onClick={handleSendTelegramTest} 
-                  disabled={!telegramStatus?.configured || !user?.telegram_chat_id || telegramTestSending}
-                  style={{ marginTop: 8, background: "#f1f5f9", color: "#334155", padding: "10px", borderRadius: 8, border: "1px solid #cbd5e1", cursor: (!telegramStatus?.configured || !user?.telegram_chat_id || telegramTestSending) ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600 }}
-                >
-                  {telegramTestSending ? 'Sending...' : 'Send Test Message'}
-                </button>
-
-                {telegramTestMessage && (
-                  <div style={{ padding: 10, borderRadius: 6, fontSize: 12, background: telegramTestMessage.includes('sent') ? '#dcfce7' : '#fef2f2', color: telegramTestMessage.includes('sent') ? '#166534' : '#b91c1c' }}>
-                    {telegramTestMessage}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
           {/* Current Plan Card */}
           <div style={{ background: isPro ? "#1e293b" : "#fff", border: isPro ? "none" : "1px solid #e5e7eb", borderRadius: 12, padding: 24, color: isPro ? "#fff" : "#111827" }}>
             <h3 style={{ fontSize: 14, fontWeight: 600, color: isPro ? "#94a3b8" : "#6b7280", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Current Plan</h3>
