@@ -224,24 +224,31 @@ const getNextDocNumber = async (userId, docType) => {
     'quotation': `QT-${year}-`,
     'proforma': `PI-${year}-`
   };
-  if (!isValidUUID(userId)) {
-    return `${prefixMap[docType] || 'DOC-'}001`;
-  }
-  const result = await dbQuerySingle(
-    `SELECT doc_number FROM documents WHERE user_id = $1 AND doc_type = $2 ORDER BY created_at DESC LIMIT 1`,
-    [userId, docType]
-  );
-  let nextNum = 1;
   const prefix = prefixMap[docType] || 'DOC-';
-  if (result && result.doc_number) {
-    if (result.doc_number.startsWith(prefix)) {
-      const remaining = result.doc_number.substring(prefix.length);
-      const match = remaining.match(/^(\d+)/);
-      if (match) {
-        nextNum = parseInt(match[1], 10) + 1;
-      }
-    }
+  if (!isValidUUID(userId)) {
+    return `${prefix}001`;
   }
+  const result = await dbQuery(
+    `SELECT doc_number FROM documents WHERE user_id = $1 AND doc_type = $2 AND doc_number LIKE $3`,
+    [userId, docType, `${prefix}%`]
+  );
+  let maxNum = 0;
+  if (result && result.length > 0) {
+    result.forEach(row => {
+      const docNumStr = row.doc_number;
+      if (docNumStr && docNumStr.startsWith(prefix)) {
+        const remaining = docNumStr.substring(prefix.length);
+        const match = remaining.match(/^(\d+)/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNum) {
+            maxNum = num;
+          }
+        }
+      }
+    });
+  }
+  const nextNum = maxNum + 1;
   return `${prefix}${String(nextNum).padStart(3, '0')}`;
 };
 
