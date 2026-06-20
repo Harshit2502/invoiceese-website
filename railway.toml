@@ -1,0 +1,6 @@
+[build]
+buildCommand = "rm -rf node_modules client/node_modules server/node_modules && npm install && cd client && npm install && cd .. && npm run build"
+
+[deploy]
+startCommand = "cd server && npm start"
+restartPolicyType = "ON_FAILURE"
